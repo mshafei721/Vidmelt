@@ -1,3 +1,5 @@
 openai
 ffmpeg-python
 python-dotenv
+Flask
+flask-sse

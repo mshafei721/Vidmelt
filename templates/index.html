@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vidmelt - Video Summarizer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #0056b3;
+            text-align: center;
+        }
+        .upload-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .upload-form input[type="file"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .upload-form input[type="submit"] {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .upload-form input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+        .status-box {
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #e9e9e9;
+            min-height: 100px;
+            overflow-y: auto;
+        }
+        .status-message {
+            margin-bottom: 5px;
+        }
+        .status-message.error {
+            color: red;
+        }
+        .status-message.complete {
+            color: green;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Vidmelt - Video Summarizer</h1>
+        <form id="uploadForm" class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+            <input type="file" name="video" accept="video/mp4" required>
+            <input type="submit" value="Upload and Summarize">
+        </form>
+
+        <h2>Processing Status</h2>
+        <div id="statusBox" class="status-box">
+            <p>Waiting for video upload...</p>
+        </div>
+    </div>
+
+    <script>
+        const statusBox = document.getElementById('statusBox');
+        const uploadForm = document.getElementById('uploadForm');
+
+        // Function to add messages to the status box
+        function addStatusMessage(message, type = 'info') {
+            const p = document.createElement('p');
+            p.classList.add('status-message');
+            if (type === 'error') {
+                p.classList.add('error');
+            } else if (type === 'complete') {
+                p.classList.add('complete');
+            }
+            p.innerHTML = message;
+            statusBox.appendChild(p);
+            statusBox.scrollTop = statusBox.scrollHeight; // Auto-scroll to bottom
+        }
+
+        // Handle form submission
+        uploadForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            statusBox.innerHTML = '<p>Uploading file...</p>'; // Clear and show upload status
+
+            const formData = new FormData(uploadForm);
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const result = await response.text();
+                console.log(result);
+            } catch (error) {
+                addStatusMessage(`Upload failed: ${error.message}`, 'error');
+            }
+        });
+
+        // Set up Server-Sent Events (SSE)
+        const eventSource = new EventSource('/stream');
+
+        eventSource.onmessage = function(event) {
+            // This catches generic messages, if any
+            console.log("Generic message:", event.data);
+        };
+
+        eventSource.addEventListener('update', function(event) {
+            const data = JSON.parse(event.data);
+            addStatusMessage(data.message);
+        });
+
+        eventSource.addEventListener('complete', function(event) {
+            const data = JSON.parse(event.data);
+            addStatusMessage(data.message, 'complete');
+            eventSource.close(); // Close connection after completion
+        });
+
+        eventSource.addEventListener('error', function(event) {
+            const data = JSON.parse(event.data);
+            addStatusMessage(data.message, 'error');
+            eventSource.close(); // Close connection on error
+        });
+
+    </script>
+</body>
+</html>

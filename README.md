@@ -14,10 +14,14 @@ TranscriptAI GPT is a local automation agent that converts videos into audio, tr
 ## Prerequisites
 
 - Python 3.8 or higher
-- `ffmpeg` installed and available in your system's PATH.
-  - **On Ubuntu/Debian:** `sudo apt update && sudo apt install ffmpeg`
-  - **On macOS (using Homebrew):** `brew install ffmpeg`
-  - **On Windows (using Chocolatey):** `choco install ffmpeg`
+- **`ffmpeg`**: A command-line tool for handling multimedia files. It must be installed and available in your system's PATH.
+  - **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH, or use Chocolatey: `choco install ffmpeg`
+  - **macOS**: `brew install ffmpeg` (using Homebrew)
+  - **Linux (Ubuntu/Debian)**: `sudo apt update && sudo apt install ffmpeg`
+- **Redis**: An in-memory data structure store used for real-time updates.
+  - **Windows**: Download from [github.com/microsoftarchive/redis/releases](https://github.com/microsoftarchive/redis/releases) or use Chocolatey: `choco install redis-64`
+  - **macOS**: `brew install redis`
+  - **Linux (Ubuntu/Debian)**: `sudo apt install redis-server`
 - An OpenAI API key.
 
 ## Setup
@@ -50,14 +54,17 @@ TranscriptAI GPT is a local automation agent that converts videos into audio, tr
 
 ## Usage
 
-1.  **Add Videos**: Place your `.mp4` video files into the `videos/` directory.
-
-2.  **Run the script**: Execute the main script from the project's root directory.
+1.  **Start the Web Application**:
     ```bash
-    python3 main.py
+    python3 app.py
     ```
+    Open your web browser and navigate to `http://127.0.0.1:5000/` (or the address shown in your terminal).
 
-3.  **View Summaries**: The script will process each video and generate a corresponding Markdown file in the `summaries/` directory.
+2.  **Upload Video**: Use the web interface to upload your `.mp4` video file.
+
+3.  **Monitor Progress**: The web interface will provide real-time updates on the processing status.
+
+4.  **View Summaries**: Once completed, a link to download the summary Markdown file will be provided on the web page.
 
 ## Folder Structure
 
@@ -68,5 +75,5 @@ video-ai-agent/
 ├── transcripts/         # Whisper transcript output (.txt)
 ├── summaries/           # Final .md files with summaries
 ├── summarize.py         # GPT summarization script
-├── main.py              # Main workflow orchestration
+├── app.py               # Flask web application
 ```
