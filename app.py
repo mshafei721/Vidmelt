@@ -40,7 +40,7 @@ def upload_file():
     if file:
         video_path = UPLOAD_FOLDER / file.filename
         file.save(video_path)
-        sse.publish({"message": f"File uploaded: {file.filename}"}, type='update')
+        sse.publish({"message": f"File uploaded: {file.filename} - Let the magic begin! ✨", "icon": "⬆️"}, type='update')
         
         # Start processing in a new thread to avoid blocking the Flask app
         threading.Thread(target=process_video_web, args=(video_path,)).start()
@@ -50,8 +50,8 @@ def process_video_web(video_path: Path):
     with app.app_context():
         # Check if ffmpeg is installed
         if shutil.which("ffmpeg") is None:
-            error_message = "Error: ffmpeg is not installed or not in your PATH. Please install it and try again."
-            sse.publish({"message": error_message}, type='error')
+            error_message = "Oops! FFmpeg is playing hide-and-seek. Please install it and try again! 🕵️‍♂️"
+            sse.publish({"message": error_message, "icon": "❌"}, type='error')
             print(error_message)
             return
 
@@ -63,7 +63,7 @@ def process_video_web(video_path: Path):
         try:
             # 1. Convert video to audio
             if not audio_path.exists():
-                sse.publish({"message": f"Extracting audio from {video_name}..."}, type='update')
+                sse.publish({"message": f"Extracting audio from {video_name}... This might take a moment, our digital ears are tuning in! 🎧", "icon": "🎶"}, type='update')
                 subprocess.run([
                     "ffmpeg",
                     "-i", str(video_path),
@@ -73,11 +73,11 @@ def process_video_web(video_path: Path):
                     "-ac", "1",
                     str(audio_path)
                 ], check=True, capture_output=True, text=True)
-                sse.publish({"message": f"Audio extracted: {audio_path.name}"}, type='update')
+                sse.publish({"message": f"Audio extracted: {audio_path.name} - Success! Our digital ears are happy. 🎉", "icon": "✅"}, type='update')
 
             # 2. Transcribe audio to text
             if not transcript_path.exists():
-                sse.publish({"message": f"Transcribing audio for {video_name}..."}, type='update')
+                sse.publish({"message": f"Transcribing audio for {video_name}... Our AI is listening intently! 👂", "icon": "✍️"}, type='update')
                 subprocess.run([
                     sys.executable, "-m", "whisper",
                     str(audio_path),
@@ -85,24 +85,23 @@ def process_video_web(video_path: Path):
                     "--language", "en",
                     "--output_dir", str(TRANSCRIPT_DIR)
                 ], check=True, capture_output=True, text=True)
-                sse.publish({"message": f"Audio transcribed: {transcript_path.name}"}, type='update')
+                sse.publish({"message": f"Audio transcribed: {transcript_path.name} - Phew, that was a lot of words! 📝", "icon": "✅"}, type='update')
             
             # 3. Summarize transcript
-            sse.publish({"message": f"Summarizing transcript for {video_name}..."}, type='update')
+            sse.publish({"message": f"Summarizing transcript for {video_name}... Our AI is brewing some wisdom! 🧠", "icon": "✨"}, type='update')
             # Import summarize_transcript here to avoid circular dependency if summarize.py imports app.py
             from summarize import summarize_transcript 
             summarize_transcript(transcript_path, video_name)
-            sse.publish({"message": f"Summary created for {video_name}."}, type='update')
-            sse.publish({"message": f"Completed! <a href='/summaries/{video_name}.md' target='_blank'>Download Summary</a>"}, type='complete')
+            sse.publish({"message": f"Summary created for {video_name}. - Ta-da! Your insights are ready! 🌟", "icon": "✅"}, type='update')
+            sse.publish({"message": f"Completed! <a href='/summaries/{video_name}.md' target='_blank'>Download Summary</a> - Mission accomplished! 🚀", "icon": "🎉"}, type='complete')
 
         except subprocess.CalledProcessError as e:
-            error_message = f"Error processing {video_name}: {e.stderr}"
-            sse.publish({"message": error_message}, type='error')
+            error_message = f"Uh oh! Something went wrong during processing: {e.stderr} 💥"
+            sse.publish({"message": error_message, "icon": "❌"}, type='error')
             print(error_message)
         except Exception as e:
-            error_message = f"An unexpected error occurred: {e}"
-            sse.publish({"message": error_message}, type='error')
-            print(error_message)
+            error_message = f"An unexpected cosmic ray hit our servers! Error: {e} 👽"
+            sse.publish({"message": error_message, "icon": "❌"}, type='error')
 
 @app.route('/summaries/<filename>')
 def download_summary(filename):

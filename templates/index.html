@@ -56,6 +56,12 @@
         }
         .status-message {
             margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .status-message .icon {
+            margin-right: 8px;
+            font-size: 1.2em;
         }
         .status-message.error {
             color: red;
@@ -63,6 +69,21 @@
         .status-message.complete {
             color: green;
             font-weight: bold;
+        }
+        /* Spinner CSS */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #007bff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+            display: none; /* Hidden by default */
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -78,14 +99,24 @@
         <div id="statusBox" class="status-box">
             <p>Waiting for video upload...</p>
         </div>
+        <div id="loadingSpinner" class="spinner"></div>
     </div>
 
     <script>
         const statusBox = document.getElementById('statusBox');
         const uploadForm = document.getElementById('uploadForm');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+
+        function showSpinner() {
+            loadingSpinner.style.display = 'block';
+        }
+
+        function hideSpinner() {
+            loadingSpinner.style.display = 'none';
+        }
 
         // Function to add messages to the status box
-        function addStatusMessage(message, type = 'info') {
+        function addStatusMessage(message, icon = '', type = 'info') {
             const p = document.createElement('p');
             p.classList.add('status-message');
             if (type === 'error') {
@@ -93,7 +124,7 @@
             } else if (type === 'complete') {
                 p.classList.add('complete');
             }
-            p.innerHTML = message;
+            p.innerHTML = `<span class="icon">${icon}</span>${message}`;
             statusBox.appendChild(p);
             statusBox.scrollTop = statusBox.scrollHeight; // Auto-scroll to bottom
         }
@@ -102,6 +133,7 @@
         uploadForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             statusBox.innerHTML = '<p>Uploading file...</p>'; // Clear and show upload status
+            showSpinner(); // Show spinner on upload start
 
             const formData = new FormData(uploadForm);
             try {
@@ -115,7 +147,8 @@
                 const result = await response.text();
                 console.log(result);
             } catch (error) {
-                addStatusMessage(`Upload failed: ${error.message}`, 'error');
+                addStatusMessage(`Upload failed: ${error.message}`, '❌', 'error');
+                hideSpinner(); // Hide spinner on upload failure
             }
         });
 
@@ -129,18 +162,20 @@
 
         eventSource.addEventListener('update', function(event) {
             const data = JSON.parse(event.data);
-            addStatusMessage(data.message);
+            addStatusMessage(data.message, data.icon || '');
         });
 
         eventSource.addEventListener('complete', function(event) {
             const data = JSON.parse(event.data);
-            addStatusMessage(data.message, 'complete');
+            addStatusMessage(data.message, data.icon || '✅', 'complete');
+            hideSpinner(); // Hide spinner on completion
             eventSource.close(); // Close connection after completion
         });
 
         eventSource.addEventListener('error', function(event) {
             const data = JSON.parse(event.data);
-            addStatusMessage(data.message, 'error');
+            addStatusMessage(data.message, data.icon || '❌', 'error');
+            hideSpinner(); // Hide spinner on error
             eventSource.close(); // Close connection on error
         });
 
