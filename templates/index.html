@@ -92,6 +92,13 @@
         <h1>Vidmelt - Video Summarizer</h1>
         <form id="uploadForm" class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
             <input type="file" name="video" accept="video/mp4" required>
+            <div class="model-selection">
+                <h3>Choose Transcription Model:</h3>
+                <label><input type="radio" name="transcription_model" value="whisper-base" checked> Whisper Base (Local)</label><br>
+                <label><input type="radio" name="transcription_model" value="whisper-medium"> Whisper Medium (Local)</label><br>
+                <label><input type="radio" name="transcription_model" value="whisper-large"> Whisper Large (Local)</label><br>
+                <label><input type="radio" name="transcription_model" value="whisper-api"> Whisper-1 (OpenAI API)</label>
+            </div>
             <input type="submit" value="Upload and Summarize">
         </form>
 
