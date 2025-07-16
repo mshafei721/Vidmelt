@@ -22,15 +22,25 @@ def summarize_transcript(transcript_path: Path, video_title: str):
         client = openai.OpenAI()
 
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant that summarizes video transcripts."
+                    "content": (
+                        "You are an expert summarization agent. "
+                        "Your goal is to create a clear, concise, and professional summary of a video transcript."
+                    )
                 },
                 {
                     "role": "user",
-                    "content": f"Summarize the following transcript in bullet points:\n\n{transcript_text}"
+                    "content": (
+                        f"Please generate a summary for the video titled '{video_title}'.\n\n"
+                        "The summary should include:\n"
+                        "1. A short, engaging title.\n"
+                        "2. A 2-3 sentence overview of the video's main topic.\n"
+                        "3. A bulleted list of the 3-5 most important key takeaways.\n\n"
+                        f"Here is the transcript:\n\n{transcript_text}"
+                    )
                 }
             ]
         )
@@ -40,11 +50,7 @@ def summarize_transcript(transcript_path: Path, video_title: str):
         # 4. File Output
         summary_path = SUMMARY_DIR / f"{video_title}.md"
         with open(summary_path, "w") as f:
-            f.write(f"# {video_title}\n\n")
-            f.write("## Summary\n")
             f.write(summary)
-            f.write("\n\n## Transcript\n")
-            f.write(transcript_text)
 
         print(f"Summary for {video_title} created successfully.")
 
