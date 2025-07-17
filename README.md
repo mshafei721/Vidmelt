@@ -58,16 +58,47 @@ FFmpeg must be installed and accessible in your system's PATH.
 
 Redis is used by `flask-sse` for real-time updates.
 
--   **Windows**:
-    1.  Download the MSOpenTech Redis release from [github.com/microsoftarchive/redis/releases](https://github.com/microsoftarchive/redis/releases).
-    2.  Run the `.msi` installer.
-    *Alternatively, use Chocolatey (if installed):*
+-   **Windows (Recommended: WSL2)**:
+    The most reliable way to run Redis on Windows is via Windows Subsystem for Linux 2 (WSL2).
+    1.  **Install WSL2**: Open PowerShell or Command Prompt as Administrator and run:
+        ```bash
+        wsl --install
+        ```
+        Restart your computer when prompted.
+    2.  **Install a Linux Distribution**: By default, Ubuntu is installed. You can open the Ubuntu app from your Start Menu.
+    3.  **Install Redis within WSL2**: Once in your WSL2 Linux terminal (e.g., Ubuntu):
+        ```bash
+        sudo apt update
+        sudo apt install redis-server
+        sudo systemctl enable redis-server # Enable Redis to start on boot
+        sudo systemctl start redis-server # Start the Redis service
+        ```
+    *Alternatively (Less Recommended for Production): Use Scoop (if installed):*
     ```bash
-    choco install redis-64
+    scoop install redis
     ```
-    *After installation, start the Redis server:*
+    *After Scoop installation, start the Redis server from PowerShell/CMD:*
     ```bash
     redis-server
+    ```
+
+-   **macOS**:
+    Using [Homebrew](https://brew.sh/):
+    ```bash
+    brew install redis
+    brew services start redis # To start Redis automatically on login
+    ```
+    *To start manually:*
+    ```bash
+    redis-server
+    ```
+
+-   **Linux (Ubuntu/Debian)**:
+    ```bash
+    sudo apt update
+    sudo apt install redis-server
+    sudo systemctl enable redis-server # Enable Redis to start on boot
+    sudo systemctl start redis-server # Start the Redis service
     ```
 
 -   **macOS**:
