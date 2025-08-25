@@ -1,0 +1,47 @@
+[build]
+  command = ""
+  publish = "client"
+
+[[redirects]]
+  from = "/api/*"
+  to = "http://localhost:5000/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/upload"
+  to = "http://localhost:5000/upload"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/submit_url"
+  to = "http://localhost:5000/submit_url"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/export"
+  to = "http://localhost:5000/export"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/stream"
+  to = "http://localhost:5000/stream"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/summaries/*"
+  to = "http://localhost:5000/summaries/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/transcripts/*"
+  to = "http://localhost:5000/transcripts/:splat"
+  status = 200
+  force = true
+
+# For production, change the above `to` targets to your backend URL.
