@@ -102,40 +102,17 @@
             <input type="submit" value="Upload and Summarize">
         </form>
 
-        <h2>Or Paste a Link (YouTube/TikTok)</h2>
-        <form id="urlForm" class="upload-form">
-            <input type="url" id="videoUrl" placeholder="https://www.youtube.com/watch?v=... or https://www.tiktok.com/..." required>
-            <div class="model-selection">
-                <label><input type="radio" name="url_transcription_model" value="whisper-base" checked> Whisper Base (Local)</label>
-                <label><input type="radio" name="url_transcription_model" value="whisper-medium"> Whisper Medium</label>
-                <label><input type="radio" name="url_transcription_model" value="whisper-large"> Whisper Large</label>
-                <label><input type="radio" name="url_transcription_model" value="whisper-api"> Whisper-1 (OpenAI API)</label>
-            </div>
-            <input type="submit" value="Fetch and Summarize">
-        </form>
-
         <h2>Processing Status</h2>
         <div id="statusBox" class="status-box">
             <p>Waiting for video upload...</p>
         </div>
         <div id="loadingSpinner" class="spinner"></div>
-
-        <h2>Your History</h2>
-        <div id="history"></div>
-        <div style="margin-top:10px;">
-            <button id="exportSummaries">Export Selected Summaries</button>
-            <button id="exportTranscripts">Export Selected Transcripts</button>
-        </div>
     </div>
 
     <script>
         const statusBox = document.getElementById('statusBox');
         const uploadForm = document.getElementById('uploadForm');
-        const urlForm = document.getElementById('urlForm');
         const loadingSpinner = document.getElementById('loadingSpinner');
-        const historyDiv = document.getElementById('history');
-        const exportSummariesBtn = document.getElementById('exportSummaries');
-        const exportTranscriptsBtn = document.getElementById('exportTranscripts');
 
         function showSpinner() {
             loadingSpinner.style.display = 'block';
@@ -182,26 +159,6 @@
             }
         });
 
-        // Handle URL submission
-        urlForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            statusBox.innerHTML = '<p>Fetching URL...</p>';
-            showSpinner();
-            const url = document.getElementById('videoUrl').value.trim();
-            const model = document.querySelector('input[name="url_transcription_model"]:checked').value;
-            try {
-                const response = await fetch('/submit_url', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, transcription_model: model })
-                });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            } catch (error) {
-                addStatusMessage(`URL submit failed: ${error.message}`, '❌', 'error');
-                hideSpinner();
-            }
-        });
-
         // Set up Server-Sent Events (SSE)
         const eventSource = new EventSource('/stream');
 
@@ -220,7 +177,6 @@
             addStatusMessage(data.message, data.icon || '✅', 'complete');
             hideSpinner(); // Hide spinner on completion
             eventSource.close(); // Close connection after completion
-            refreshHistory(); // refresh user history
         });
 
         eventSource.addEventListener('error', function(event) {
@@ -229,55 +185,6 @@
             hideSpinner(); // Hide spinner on error
             eventSource.close(); // Close connection on error
         });
-
-        async function refreshHistory() {
-            try {
-                const res = await fetch('/api/history');
-                if (!res.ok) throw new Error('failed to load history');
-                const items = await res.json();
-                historyDiv.innerHTML = '';
-                if (!items.length) {
-                    historyDiv.innerHTML = '<p>No history yet.</p>';
-                    return;
-                }
-                const list = document.createElement('div');
-                items.forEach(item => {
-                    const row = document.createElement('div');
-                    row.style.marginBottom = '6px';
-                    row.innerHTML = `
-                        <label>
-                            <input type="checkbox" class="hist-cb" value="${item.id}">
-                            <strong>${item.video_title || item.original_filename}</strong>
-                            <small>(${item.platform || 'local'})</small>
-                            - <a href="/summaries/${encodeURIComponent(item.video_title)}.md" target="_blank">summary</a>
-                            - <a href="/transcripts/${encodeURIComponent(item.video_title)}.txt" target="_blank">transcript</a>
-                        </label>
-                    `;
-                    list.appendChild(row);
-                });
-                historyDiv.appendChild(list);
-            } catch (e) {
-                historyDiv.innerHTML = `<p style="color:red;">History error: ${e.message}</p>`;
-            }
-        }
-
-        function getSelectedIds() {
-            return Array.from(document.querySelectorAll('.hist-cb:checked')).map(cb => cb.value).join(',');
-        }
-
-        exportSummariesBtn.addEventListener('click', () => {
-            const ids = getSelectedIds();
-            if (!ids) return alert('Select at least one item');
-            window.open(`/export?kind=summary&ids=${encodeURIComponent(ids)}`, '_blank');
-        });
-        exportTranscriptsBtn.addEventListener('click', () => {
-            const ids = getSelectedIds();
-            if (!ids) return alert('Select at least one item');
-            window.open(`/export?kind=transcript&ids=${encodeURIComponent(ids)}`, '_blank');
-        });
-
-        // Initial load
-        refreshHistory();
 
     </script>
 </body>

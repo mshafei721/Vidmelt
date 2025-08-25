@@ -2,7 +2,7 @@ import redis
 import openai
 import sys
 import shutil
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify, Response
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory
 from flask_sse import sse
 import os
 from pathlib import Path
@@ -10,7 +10,6 @@ import subprocess
 from dotenv import load_dotenv
 import time
 import threading
-from urllib.parse import urlparse
 
 # Load environment variables
 load_dotenv()
@@ -29,10 +28,6 @@ SUMMARY_DIR = Path("summaries")
 # Ensure directories exist
 for directory in [UPLOAD_FOLDER, AUDIO_DIR, TRANSCRIPT_DIR, SUMMARY_DIR]:
     directory.mkdir(exist_ok=True)
-
-# DB
-from db import init_db, add_history, list_history
-init_db()
 
 @app.route('/')
 def index():
@@ -54,52 +49,10 @@ def upload_file():
         print(f"DEBUG: Selected transcription model from form: {transcription_model}")
 
         # Start processing in a new thread to avoid blocking the Flask app
-        threading.Thread(target=process_video_web, args=(video_path, transcription_model, None, None,)).start()
+        threading.Thread(target=process_video_web, args=(video_path, transcription_model,)).start()
         return "Upload successful, processing started."
 
-@app.route('/submit_url', methods=['POST'])
-def submit_url():
-    data = request.form or request.json or {}
-    url = data.get('url')
-    transcription_model = data.get('transcription_model', 'whisper-base')
-    if not url:
-        return jsonify({"error": "url is required"}), 400
-    threading.Thread(target=process_url_web, args=(url, transcription_model)).start()
-    return "URL received, processing started."
-
-
-def process_url_web(url: str, transcription_model: str):
-    """Download a remote video via yt-dlp then process it."""
-    parsed = urlparse(url)
-    platform = (
-        'youtube' if 'youtube' in parsed.netloc or 'youtu.be' in parsed.netloc
-        else 'tiktok' if 'tiktok' in parsed.netloc
-        else 'remote'
-    )
-    # Use yt-dlp to download best mp4 into UPLOAD_FOLDER
-    output_template = str(UPLOAD_FOLDER / "%(title)s.%(ext)s")
-    try:
-        sse.publish({"message": f"Fetching video from {platform}...", "icon": "🌐"}, type='update')
-        subprocess.run([
-            "yt-dlp",
-            "-f", "mp4/best",
-            "-o", output_template,
-            url
-        ], check=True, capture_output=True, text=True)
-        # Find the newest file in UPLOAD_FOLDER as our download
-        candidates = sorted(UPLOAD_FOLDER.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
-        if not candidates:
-            raise RuntimeError("No downloaded video found")
-        video_path = candidates[0]
-        process_video_web(video_path, transcription_model, url, platform)
-    except subprocess.CalledProcessError as e:
-        error_message = f"yt-dlp failed: {e.stderr or e.stdout}"
-        sse.publish({"message": error_message, "icon": "❌"}, type='error')
-    except Exception as e:
-        sse.publish({"message": f"Download error: {e}", "icon": "❌"}, type='error')
-
-
-def process_video_web(video_path: Path, transcription_model: str, source_url: str | None, platform: str | None):
+def process_video_web(video_path: Path, transcription_model: str):
     with app.app_context():
         print(f"DEBUG: Processing video: {video_path.name} with transcription model: {transcription_model}")
         # Check if ffmpeg is installed
@@ -181,19 +134,6 @@ def process_video_web(video_path: Path, transcription_model: str, source_url: st
             from summarize import summarize_transcript 
             summarize_transcript(transcript_path, video_name)
             sse.publish({"message": f"Summary created for {video_name}. - Ta-da! Your insights are ready! 🌟", "icon": "✅"}, type='update')
-            # Record history
-            try:
-                add_history(
-                    source_url=source_url,
-                    platform=platform,
-                    original_filename=video_path.name,
-                    video_title=video_name,
-                    transcript_path=str(transcript_path),
-                    summary_path=str(summary_path),
-                )
-            except Exception as e:
-                print(f"WARN: failed to write history: {e}")
-
             sse.publish({"message": f"Completed! <a href='/summaries/{video_name}.md' target='_blank'>Download Summary</a> - Mission accomplished! 🚀", "icon": "🎉"}, type='complete')
 
         except subprocess.CalledProcessError as e:
@@ -207,58 +147,6 @@ def process_video_web(video_path: Path, transcription_model: str, source_url: st
 @app.route('/summaries/<filename>')
 def download_summary(filename):
     return send_from_directory(SUMMARY_DIR, filename, as_attachment=True)
-
-@app.route('/transcripts/<filename>')
-def download_transcript(filename):
-    return send_from_directory(TRANSCRIPT_DIR, filename, as_attachment=True)
-
-
-@app.route('/api/history')
-def api_history():
-    return jsonify(list_history())
-
-
-@app.route('/export')
-def export_markdown():
-    """Export one or more summaries or transcripts as a single Markdown file.
-    Params: ids (comma-separated history ids), kind=summary|transcript
-    """
-    from db import DB_PATH  # not used directly; kept for future filtering
-    ids_param = request.args.get('ids', '')
-    kind = request.args.get('kind', 'summary')
-    if kind not in ("summary", "transcript"):
-        return jsonify({"error": "invalid kind"}), 400
-    try:
-        ids = [int(i) for i in ids_param.split(',') if i.strip()]
-    except ValueError:
-        return jsonify({"error": "invalid ids"}), 400
-
-    items = list_history(limit=10000)
-    by_id = {it['id']: it for it in items}
-    selected = [by_id[i] for i in ids if i in by_id]
-    if not selected:
-        return jsonify({"error": "no matching items"}), 404
-
-    parts = [f"# Exported {kind.title()}s ({len(selected)})"]
-    for it in selected:
-        title = it.get('video_title') or it.get('original_filename')
-        parts.append(f"\n\n## {title}\n")
-        path = it['summary_path'] if kind == 'summary' else it['transcript_path']
-        try:
-            text = Path(path).read_text(encoding='utf-8', errors='ignore')
-        except Exception:
-            text = f"[Error reading {path}]"
-        parts.append(text)
-
-    body = "\n\n---\n".join(parts)
-    filename = f"export-{kind}s-{int(time.time())}.md"
-    return Response(
-        body,
-        mimetype='text/markdown',
-        headers={
-            'Content-Disposition': f'attachment; filename="{filename}"'
-        }
-    )
 
 if __name__ == '__main__':
     # Check for OpenAI API key

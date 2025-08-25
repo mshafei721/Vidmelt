@@ -3,5 +3,3 @@ ffmpeg-python
 python-dotenv
 Flask
 flask-sse
-pytest
-yt-dlp
