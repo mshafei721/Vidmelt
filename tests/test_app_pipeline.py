@@ -54,9 +54,8 @@ def test_process_video_web_happy_path(tmp_path, monkeypatch):
     monkeypatch.setattr(summarize_mod, "summarize_transcript", _stub_summarize)
 
     # Act
-    app_mod.process_video_web(video_path, "whisper-base")
+    app_mod.process_video_web(video_path, "whisper-base", None, None)
 
     # Assert
     out = app_mod.SUMMARY_DIR / f"{video_path.stem}.md"
     assert out.exists(), "Summary was not generated"
-
