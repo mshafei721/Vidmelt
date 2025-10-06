@@ -7,6 +7,10 @@ from pathlib import Path
 TRANSCRIPT_DIR = Path("transcripts")
 SUMMARY_DIR = Path("summaries")
 
+
+class SummarizationError(RuntimeError):
+    """Raised when summarization fails."""
+
 def summarize_transcript(transcript_path: Path, video_title: str):
     """
     Summarizes a transcript using OpenAI GPT-3.5/4.
@@ -55,4 +59,4 @@ def summarize_transcript(transcript_path: Path, video_title: str):
         print(f"Summary for {video_title} created successfully.")
 
     except Exception as e:
-        print(f"Error summarizing {video_title}: {e}")
+        raise SummarizationError(f"failed to summarize {video_title}: {e}") from e
