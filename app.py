@@ -2,7 +2,7 @@ import redis
 import openai
 import sys
 import shutil
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, redirect, send_from_directory
 from flask_sse import sse
 import os
 from pathlib import Path
@@ -90,51 +90,75 @@ def process_video_web(video_path: Path, transcription_model: str):
                 return
 
             # 2. Transcribe audio to text
-            print(f"DEBUG: Checking if transcript exists: {transcript_path.exists()}")
-            # Temporarily removing the 'if not transcript_path.exists():' for debugging
-            # if not transcript_path.exists():
-            sse.publish({"message": f"Transcribing audio for {video_name}... Our AI is listening intently! 👂", "icon": "✍️"}, type='update')
-            
-            if transcription_model.startswith('whisper-') and transcription_model != 'whisper-api':
-                model_name = transcription_model.split('-')[1] # base, medium, large
-                subprocess.run([
-                    sys.executable, "-m", "whisper",
-                    str(audio_path),
-                    "--model", model_name,
-                    "--language", "en",
-                    "--output_dir", str(TRANSCRIPT_DIR)
-                ], check=True, capture_output=True, text=True)
-            elif transcription_model == 'whisper-api':
-                print("DEBUG: Attempting to call OpenAI Whisper API...")
-                client = openai.OpenAI()
-                try:
-                    with open(audio_path, "rb") as audio_file:
-                        transcript_response = client.audio.transcriptions.create(
-                            model="whisper-1", 
-                            file=audio_file
-                        )
-                    with open(transcript_path, "w") as f:
-                        f.write(transcript_response.text)
-                    print("DEBUG: OpenAI Whisper API call successful.")
-                except openai.APIError as e:
-                    error_message = f"OpenAI API Error during transcription: {e.status_code} - {e.response}"
+            transcript_exists = transcript_path.exists()
+            print(f"DEBUG: Checking if transcript exists: {transcript_exists}")
+
+            if not transcript_exists:
+                sse.publish({"message": f"Transcribing audio for {video_name}... Our AI is listening intently! 👂", "icon": "✍️"}, type='update')
+
+                if transcription_model.startswith('whisper-') and transcription_model != 'whisper-api':
+                    model_name = transcription_model.split('-')[1] # base, medium, large
+                    subprocess.run([
+                        sys.executable, "-m", "whisper",
+                        str(audio_path),
+                        "--model", model_name,
+                        "--language", "en",
+                        "--output_dir", str(TRANSCRIPT_DIR)
+                    ], check=True, capture_output=True, text=True)
+                elif transcription_model == 'whisper-api':
+                    print("DEBUG: Attempting to call OpenAI Whisper API...")
+                    client = openai.OpenAI()
+                    try:
+                        with open(audio_path, "rb") as audio_file:
+                            transcript_response = client.audio.transcriptions.create(
+                                model="whisper-1", 
+                                file=audio_file
+                            )
+                        with open(transcript_path, "w") as f:
+                            f.write(transcript_response.text)
+                        print("DEBUG: OpenAI Whisper API call successful.")
+                    except openai.APIError as e:
+                        error_message = f"OpenAI API Error during transcription: {e.status_code} - {e.response}"
+                        sse.publish({"message": error_message, "icon": "❌"}, type='error')
+                        print(error_message)
+                        return
+                else:
+                    error_message = f"Invalid transcription model selected: {transcription_model}"
                     sse.publish({"message": error_message, "icon": "❌"}, type='error')
-                    print(error_message)
-                    return
+                    raise ValueError(error_message)
+
+                transcript_exists = transcript_path.exists()
             else:
-                error_message = f"Invalid transcription model selected: {transcription_model}"
+                sse.publish({"message": f"Transcript found for {video_name}, skipping re-transcription. 📝", "icon": "🗂️"}, type='update')
+
+            if not transcript_exists or transcript_path.stat().st_size == 0:
+                error_message = f"Transcription failed for {video_name}; no transcript was produced. ❌"
                 sse.publish({"message": error_message, "icon": "❌"}, type='error')
-                raise ValueError(error_message)
-            
+                print(error_message)
+                return
+
             sse.publish({"message": f"Audio transcribed: {transcript_path.name} - Phew, that was a lot of words! 📝", "icon": "✅"}, type='update')
-            
+
             # 3. Summarize transcript
             sse.publish({"message": f"Summarizing transcript for {video_name}... Our AI is brewing some wisdom! 🧠", "icon": "✨"}, type='update')
-            # Import summarize_transcript here to avoid circular dependency if summarize.py imports app.py
-            from summarize import summarize_transcript 
-            summarize_transcript(transcript_path, video_name)
+            from summarize import SummarizationError, summarize_transcript
+            try:
+                summarize_transcript(transcript_path, video_name)
+            except SummarizationError as err:
+                error_message = f"Summarization failed for {video_name}: {err}"
+                sse.publish({"message": error_message, "icon": "❌"}, type='error')
+                print(error_message)
+                return
+
             sse.publish({"message": f"Summary created for {video_name}. - Ta-da! Your insights are ready! 🌟", "icon": "✅"}, type='update')
-            sse.publish({"message": f"Completed! <a href='/summaries/{video_name}.md' target='_blank'>Download Summary</a> - Mission accomplished! 🚀", "icon": "🎉"}, type='complete')
+            sse.publish({
+                "message": (
+                    "Completed! "
+                    f"<a href='/summaries/{summary_path.name}' target='_blank'>Download Summary</a> | "
+                    f"<a href='/transcripts/{transcript_path.name}' target='_blank'>Download Transcript</a> - Mission accomplished! 🚀"
+                ),
+                "icon": "🎉"
+            }, type='complete')
 
         except subprocess.CalledProcessError as e:
             error_message = f"Uh oh! A tool ran into trouble! 🛠️\nCommand: {e.cmd}\nReturn Code: {e.returncode}\nStdout: {e.stdout}\nStderr: {e.stderr} 💥"
@@ -147,6 +171,11 @@ def process_video_web(video_path: Path, transcription_model: str):
 @app.route('/summaries/<filename>')
 def download_summary(filename):
     return send_from_directory(SUMMARY_DIR, filename, as_attachment=True)
+
+
+@app.route('/transcripts/<filename>')
+def download_transcript(filename):
+    return send_from_directory(TRANSCRIPT_DIR, filename, as_attachment=True)
 
 if __name__ == '__main__':
     # Check for OpenAI API key
