@@ -2,7 +2,7 @@ import redis
 import openai
 import sys
 import shutil
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, redirect, send_from_directory
 from flask_sse import sse
 import os
 from pathlib import Path
@@ -151,7 +151,14 @@ def process_video_web(video_path: Path, transcription_model: str):
                 return
 
             sse.publish({"message": f"Summary created for {video_name}. - Ta-da! Your insights are ready! 🌟", "icon": "✅"}, type='update')
-            sse.publish({"message": f"Completed! <a href='/summaries/{video_name}.md' target='_blank'>Download Summary</a> - Mission accomplished! 🚀", "icon": "🎉"}, type='complete')
+            sse.publish({
+                "message": (
+                    "Completed! "
+                    f"<a href='/summaries/{summary_path.name}' target='_blank'>Download Summary</a> | "
+                    f"<a href='/transcripts/{transcript_path.name}' target='_blank'>Download Transcript</a> - Mission accomplished! 🚀"
+                ),
+                "icon": "🎉"
+            }, type='complete')
 
         except subprocess.CalledProcessError as e:
             error_message = f"Uh oh! A tool ran into trouble! 🛠️\nCommand: {e.cmd}\nReturn Code: {e.returncode}\nStdout: {e.stdout}\nStderr: {e.stderr} 💥"
@@ -164,6 +171,11 @@ def process_video_web(video_path: Path, transcription_model: str):
 @app.route('/summaries/<filename>')
 def download_summary(filename):
     return send_from_directory(SUMMARY_DIR, filename, as_attachment=True)
+
+
+@app.route('/transcripts/<filename>')
+def download_transcript(filename):
+    return send_from_directory(TRANSCRIPT_DIR, filename, as_attachment=True)
 
 if __name__ == '__main__':
     # Check for OpenAI API key

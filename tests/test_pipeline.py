@@ -53,7 +53,8 @@ def test_process_video_skips_transcription_when_transcript_exists(monkeypatch, t
 
     def fake_summarize(path, title):
         assert path == transcript_path
-        summary_path.write_text("summary")
+        generated_path = temp_dirs.summaries / f"{title}.md"
+        generated_path.write_text("summary")
 
     monkeypatch.setattr(app_module.sse, "publish", fake_publish)
     monkeypatch.setattr(summarize_module, "summarize_transcript", fake_summarize)
@@ -68,6 +69,11 @@ def test_process_video_skips_transcription_when_transcript_exists(monkeypatch, t
 
     assert summary_path.exists(), "Summary should still be generated from cached transcript"
     assert any("skipping re-transcription" in message for _type, message in events)
+    complete_events = [message for event_type, message in events if event_type == "complete"]
+    assert complete_events, "Completion event with download links is expected"
+    complete_message = complete_events[-1]
+    assert "summaries/sample.md" in complete_message
+    assert "transcripts/sample.txt" in complete_message
 
 
 def test_process_video_reports_summarization_errors(monkeypatch, temp_dirs):

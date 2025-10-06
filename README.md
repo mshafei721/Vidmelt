@@ -142,9 +142,19 @@ cd vidmelt
 ```bash
 pip install -r requirements.txt
 ```
-This command will install all necessary Python libraries, including `openai`, `ffmpeg-python`, `python-dotenv`, `Flask`, and `flask-sse`, and the `openai-whisper` library.
+This command installs the core runtime (Flask, SSE, Redis client) together with `openai`, `ffmpeg-python`, `openai-whisper`, and pinned `numpy/numba` versions that keep Whisper CLI working.
 
-### 3. Configure Your OpenAI API Key 🔑
+### 3. Verify Your Environment
+
+Before launching the web app, run the built-in doctor to confirm FFmpeg, Redis, Whisper, and your OpenAI credentials are ready:
+
+```bash
+python -m vidmelt.doctor
+```
+
+Any failing check will be listed with remediation hints; fix them before continuing.
+
+### 4. Configure Your OpenAI API Key 🔑
 
 Create a `.env` file in the root of your project by copying the example:
 
@@ -181,7 +191,7 @@ Open your web browser and navigate to `http://127.0.0.1:5000/` (or the address s
 
 -   Use the web interface to upload your `.mp4` video file.
 -   Monitor the real-time progress updates directly on the page.
--   Once processing is complete, a link to download the summary Markdown file will appear.
+-   Once processing is complete, a link to download the summary Markdown and the raw transcript will appear.
 
 ## 📂 Project Structure
 
