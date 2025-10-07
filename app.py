@@ -89,7 +89,12 @@ def upload_file():
 def process_video_web(video_path: Path, transcription_model: str):
     with app.app_context():
         print(f"DEBUG: Processing video: {video_path.name} with transcription model: {transcription_model}")
-        pipeline.process_video(video_path, transcription_model, publish=EVENT_BUS.publish)
+        pipeline.process_video(
+            video_path,
+            transcription_model,
+            publish=EVENT_BUS.publish,
+            knowledge_base=KB,
+        )
 
 @app.route('/summaries/<filename>')
 def download_summary(filename):

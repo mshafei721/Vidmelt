@@ -10,7 +10,7 @@ from typing import Callable, Optional
 import openai
 
 from summarize import SummarizationError, summarize_transcript
-from vidmelt import history
+from vidmelt import history, knowledge
 
 Publisher = Callable[[dict[str, str], str], None]
 
@@ -51,6 +51,7 @@ def process_video(
     publish: Optional[Publisher] = None,
     *,
     job_store: Optional[history.JobStore] = None,
+    knowledge_base: Optional[knowledge.KnowledgeBase] = None,
     job_id: Optional[int] = None,
 ) -> bool:
     """Process a single video and return True on success."""
@@ -65,6 +66,7 @@ def process_video(
     transcript_path = TRANSCRIPT_DIR / f"{video_name}.txt"
     summary_path = SUMMARY_DIR / f"{video_name}.md"
     job_store = job_store or history.GLOBAL_STORE
+    knowledge_base = knowledge_base or knowledge.KnowledgeBase()
     if job_id is None:
         job_id = job_store.record_start(video_path, transcription_model)
     else:
@@ -147,6 +149,8 @@ def process_video(
             f"<a href='/transcripts/{transcript_path.name}' target='_blank'>Download Transcript</a> - Mission accomplished! 🚀"
         ), "🎉")
         job_store.record_success(job_id, summary_path)
+        knowledge_base.upsert_document(video_name, transcript_path, summary_path)
+        knowledge_base.update_embeddings_for(video_name)
         return True
 
     except subprocess.CalledProcessError as exc:

@@ -160,6 +160,55 @@ class KnowledgeBase:
                 )
             conn.commit()
 
+    def upsert_document(
+        self,
+        video_name: str,
+        transcript_path: Path,
+        summary_path: Optional[Path] = None,
+    ) -> None:
+        transcript_text = transcript_path.read_text(encoding="utf-8")
+        summary_text = summary_path.read_text(encoding="utf-8") if summary_path and summary_path.exists() else None
+        with self._connect() as conn:
+            conn.execute(
+                "REPLACE INTO documents (video_name, transcript_path, summary_path, transcript, summary) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (
+                    video_name,
+                    str(transcript_path),
+                    str(summary_path) if summary_path else None,
+                    transcript_text,
+                    summary_text,
+                ),
+            )
+            conn.commit()
+
+    def update_embeddings_for(self, video_name: str, *, model_name: str = DEFAULT_EMBED_MODEL) -> None:
+        model = _load_embeddings_model(model_name)
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT transcript, summary FROM documents WHERE video_name = ?",
+                (video_name,),
+            ).fetchone()
+            if row is None:
+                return
+            conn.execute("DELETE FROM embeddings WHERE video_name = ?", (video_name,))
+            text_source = row["summary"] or row["transcript"]
+            chunks = _chunk_text(text_source)
+            vectors = model.encode(chunks, convert_to_numpy=True, normalize_embeddings=True)
+            for idx, (chunk, vector) in enumerate(zip(chunks, vectors)):
+                conn.execute(
+                    "INSERT INTO embeddings (video_name, chunk_index, chunk_text, embedding, norm)"
+                    " VALUES (?, ?, ?, ?, ?)",
+                    (
+                        video_name,
+                        idx,
+                        chunk,
+                        _to_blob(vector),
+                        float(np.linalg.norm(vector)),
+                    ),
+                )
+            conn.commit()
+
     def search(self, query: str, *, limit: int = 5) -> Iterator[SearchHit]:
         match_query = _sanitize_query(query)
         with self._connect() as conn:
@@ -180,28 +229,12 @@ class KnowledgeBase:
 
     # Embeddings -----------------------------------------------------------------
     def build_embeddings(self, *, model_name: str = DEFAULT_EMBED_MODEL) -> None:
-        model = _load_embeddings_model(model_name)
-
         with self._connect() as conn:
-            conn.execute("DELETE FROM embeddings")
-            cur = conn.execute("SELECT video_name, transcript, summary FROM documents")
-            rows = cur.fetchall()
-            for row in rows:
-                chunks = _chunk_text(row["summary"] or row["transcript"])
-                vectors = model.encode(chunks, convert_to_numpy=True, normalize_embeddings=True)
-                for idx, (chunk, vector) in enumerate(zip(chunks, vectors)):
-                    conn.execute(
-                        "INSERT INTO embeddings (video_name, chunk_index, chunk_text, embedding, norm)"
-                        " VALUES (?, ?, ?, ?, ?)",
-                        (
-                            row["video_name"],
-                            idx,
-                            chunk,
-                            _to_blob(vector),
-                            float(np.linalg.norm(vector)),
-                        ),
-                    )
-            conn.commit()
+            cur = conn.execute("SELECT video_name FROM documents")
+            video_names = [row["video_name"] for row in cur.fetchall()]
+
+        for video_name in video_names:
+            self.update_embeddings_for(video_name, model_name=model_name)
 
     def semantic_search(self, query: str, *, limit: int = 5, model_name: str = DEFAULT_EMBED_MODEL) -> Iterator[SemanticHit]:
         with self._connect() as conn:
