@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from dataclasses import dataclass
 from functools import lru_cache
@@ -100,6 +101,15 @@ def _chunk_text(text: str, max_chars: int = 400) -> List[str]:
     return chunks
 
 
+_NON_WORD = re.compile(r"[^\w\s]")
+
+
+def _sanitize_query(query: str) -> str:
+    cleaned = _NON_WORD.sub(" ", query or "")
+    normalized = " ".join(cleaned.split())
+    return normalized or "*"
+
+
 def _to_blob(vector: np.ndarray) -> bytes:
     return vector.astype(np.float32).tobytes()
 
@@ -151,13 +161,14 @@ class KnowledgeBase:
             conn.commit()
 
     def search(self, query: str, *, limit: int = 5) -> Iterator[SearchHit]:
+        match_query = _sanitize_query(query)
         with self._connect() as conn:
             cur = conn.execute(
                 "SELECT d.video_name, d.transcript_path, d.summary_path, "
                 "snippet(documents_fts, -1, '[', ']', ' … ', 10) AS snippet "
                 "FROM documents_fts JOIN documents d ON d.rowid = documents_fts.rowid "
                 "WHERE documents_fts MATCH ? ORDER BY rank LIMIT ?",
-                (query, limit),
+                (match_query, limit),
             )
             for row in cur.fetchall():
                 yield SearchHit(
