@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vidmelt Jobs</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; background-color: #f9fbfc; }
+        h1 { color: #0b5394; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.5rem; border-bottom: 1px solid #ddd; text-align: left; }
+        th { background-color: #eef3f7; }
+        .status-complete { color: #2e7d32; }
+        .status-failed { color: #c62828; }
+        .status-processing { color: #ff8f00; }
+    </style>
+</head>
+<body>
+    <h1>Recent Jobs</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Video</th>
+                <th>Model</th>
+                <th>Status</th>
+                <th>Summary</th>
+                <th>Started</th>
+                <th>Finished</th>
+                <th>Error</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in jobs %}
+            <tr>
+                <td>{{ job.video_path }}</td>
+                <td>{{ job.model }}</td>
+                <td class="status-{{ job.status }}">{{ job.status }}</td>
+                <td>{% if job.summary_path %}<a href="/summaries/{{ job.summary_path.split('/')[-1] }}">Download</a>{% else %}-{% endif %}</td>
+                <td>{{ job.started_at | round(0) }}</td>
+                <td>{% if job.finished_at %}{{ job.finished_at | round(0) }}{% else %}-{% endif %}</td>
+                <td>{% if job.error %}{{ job.error }}{% else %}-{% endif %}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7">No jobs yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

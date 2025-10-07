@@ -192,6 +192,27 @@ Open your web browser and navigate to `http://127.0.0.1:5000/` (or the address s
 -   Use the web interface to upload your `.mp4` video file.
 -   Monitor the real-time progress updates directly on the page.
 -   Once processing is complete, a link to download the summary Markdown and the raw transcript will appear.
+-   Visit `/jobs` to review recent processing history and re-download summaries.
+
+### Optional: Batch Mode (CLI)
+
+To process an entire folder of `.mp4` files without launching the web UI:
+
+```bash
+python -m vidmelt.batch /path/to/videos --model whisper-base
+```
+
+Add `--dry-run` to preview the work queue. The CLI reuses the core pipeline and skips videos that already have a Markdown summary in `summaries/`.
+
+### Optional: Redis-less Events
+
+By default Vidmelt streams progress using Redis. To run without Redis (useful on single-node or WSL setups), set:
+
+```bash
+export VIDMELT_EVENT_STRATEGY=in-memory
+```
+
+This enables an in-process Server-Sent Events channel. Limit usage to one Flask instance per machine because events are kept in-memory.
 
 ## 📂 Project Structure
 
@@ -213,6 +234,7 @@ vidmelt/
 │   └── .gitkeep
 ├── summaries/            # 📄 Final .md files with summaries
 │   └── .gitkeep
+├── logs/                 # 🪵 FFmpeg/Whisper diagnostic logs per video
 └── templates/            # 🖥️ HTML templates for the web interface
     └── index.html
 ```
