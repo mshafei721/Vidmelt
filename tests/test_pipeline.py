@@ -63,6 +63,20 @@ def temp_dirs(tmp_path, monkeypatch):
     dummy_store = DummyStore()
     monkeypatch.setattr(pipeline_module.history, "GLOBAL_STORE", dummy_store)
 
+    class DummyKB:
+        def __init__(self):
+            self.upserts = []
+
+        def upsert_document(self, video_name, transcript_path, summary_path):
+            self.upserts.append((video_name, Path(transcript_path), summary_path))
+
+        def update_embeddings_for(self, video_name, model_name=None):
+            self.upserts.append(("embed", video_name))
+
+    dummy_kb = DummyKB()
+    monkeypatch.setattr(pipeline_module.knowledge, "KnowledgeBase", lambda: dummy_kb)
+    monkeypatch.setattr(app_module, "KB", dummy_kb)
+
     return SimpleNamespace(
         videos=videos,
         audio=audio,
@@ -72,6 +86,7 @@ def temp_dirs(tmp_path, monkeypatch):
         events=events,
         store=dummy_store,
         store_events=store_events,
+        kb=dummy_kb,
     )
 
 
@@ -113,6 +128,7 @@ def test_process_video_skips_transcription_when_transcript_exists(monkeypatch, t
     assert "transcripts/sample.txt" in complete_message
     assert store_events.started and store_events.started[0][0].name == "sample.mp4"
     assert store_events.succeeded and not store_events.failed
+    assert temp_dirs.kb.upserts
 
 
 def test_process_video_reports_summarization_errors(monkeypatch, temp_dirs):
@@ -178,6 +194,7 @@ def test_process_video_logs_outputs(monkeypatch, temp_dirs):
     assert "ffmpeg out" in contents
     assert "whisper out" in contents
     assert store_events.succeeded
+    assert any(item[0] == "embed" for item in temp_dirs.kb.upserts)
 
 
 def test_process_video_retry(monkeypatch, temp_dirs):

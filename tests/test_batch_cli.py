@@ -17,6 +17,15 @@ def test_batch_cli_dry_run(tmp_path, monkeypatch, capsys):
 
     import vidmelt.batch as batch
 
+    class DummyKB:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def sync_from_directories(self, *args, **kwargs):
+            pass
+
+    monkeypatch.setattr(batch.knowledge, "KnowledgeBase", lambda: DummyKB())
+
     summaries = tmp_path / "summaries"
     logs = tmp_path / "logs"
     summaries.mkdir()
@@ -56,6 +65,15 @@ def test_batch_cli_skips_completed(tmp_path, monkeypatch):
 
     import vidmelt.batch as batch
 
+    class DummyKB:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def sync_from_directories(self, *args, **kwargs):
+            pass
+
+    monkeypatch.setattr(batch.knowledge, "KnowledgeBase", lambda: DummyKB())
+
     logs = tmp_path / "logs"
     logs.mkdir()
 
@@ -65,7 +83,7 @@ def test_batch_cli_skips_completed(tmp_path, monkeypatch):
 
     calls = []
 
-    def fake_process(video_path, model, publish=None, job_id=None):
+    def fake_process(video_path, model, publish=None, knowledge_base=None, job_id=None):
         calls.append((video_path, model))
 
     monkeypatch.setattr(batch.pipeline, "process_video", fake_process)
@@ -84,6 +102,15 @@ def test_batch_cli_resume(monkeypatch, tmp_path):
 
     import vidmelt.batch as batch
     from vidmelt import history
+
+    class DummyKB:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def sync_from_directories(self, *args, **kwargs):
+            pass
+
+    monkeypatch.setattr(batch.knowledge, "KnowledgeBase", lambda: DummyKB())
 
     class DummyStore:
         def retryable_jobs(self):
@@ -105,7 +132,7 @@ def test_batch_cli_resume(monkeypatch, tmp_path):
 
     calls = []
 
-    def fake_process(video, model, publish=None, job_id=None):
+    def fake_process(video, model, publish=None, knowledge_base=None, job_id=None):
         calls.append((video, model, job_id))
 
     monkeypatch.setattr(batch.pipeline, "SUMMARY_DIR", tmp_path / "summaries")

@@ -1,12 +1,13 @@
 import redis
-from flask import Flask, render_template, request, redirect, send_from_directory
+from flask import Flask, jsonify, render_template, request, redirect, send_from_directory
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 import threading
 
-from vidmelt import pipeline, history
+from vidmelt import pipeline, history, knowledge
 from vidmelt.events import build_event_bus, RedisEventBus
+from vidmelt import chat as chat_module
 
 # Load environment variables
 load_dotenv()
@@ -15,6 +16,26 @@ print(f"DEBUG: OPENAI_API_KEY loaded: {bool(os.getenv('OPENAI_API_KEY'))}")
 app = Flask(__name__)
 app.config["REDIS_URL"] = "redis://localhost:6379/0"
 EVENT_BUS = build_event_bus(app)
+KB = knowledge.KnowledgeBase()
+
+
+def _default_generate_answer(question: str, hits):
+    snippets = [hit.snippet for hit in hits]
+    answer = chat_module.generate_answer(question, hits)
+    sources = [
+        {
+            "video": hit.video_name,
+            "transcript": hit.transcript_path,
+            "summary": hit.summary_path,
+            "snippet": hit.snippet,
+            "score": hit.score,
+        }
+        for hit in hits
+    ]
+    return answer, sources
+
+
+generate_answer = _default_generate_answer
 
 # Directories (shared with pipeline module)
 UPLOAD_FOLDER = pipeline.UPLOAD_FOLDER
@@ -30,6 +51,21 @@ def index():
 def jobs():
     jobs = list(history.GLOBAL_STORE.list_recent(50))
     return render_template('jobs.html', jobs=jobs)
+
+
+@app.route('/chat', methods=['POST'])
+def chat_endpoint():
+    payload = request.get_json(force=True) or {}
+    question = (payload.get('question') or '').strip()
+    if not question:
+        return jsonify({"error": "question is required"}), 400
+    top_k = int(payload.get('top_k', 5))
+    hits = list(KB.semantic_search(question, limit=top_k))
+    if not hits:
+        return jsonify({"answer": "I could not find anything relevant.", "sources": []})
+
+    answer, sources = generate_answer(question, hits)
+    return jsonify({"answer": answer, "sources": sources})
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -53,7 +89,12 @@ def upload_file():
 def process_video_web(video_path: Path, transcription_model: str):
     with app.app_context():
         print(f"DEBUG: Processing video: {video_path.name} with transcription model: {transcription_model}")
-        pipeline.process_video(video_path, transcription_model, publish=EVENT_BUS.publish)
+        pipeline.process_video(
+            video_path,
+            transcription_model,
+            publish=EVENT_BUS.publish,
+            knowledge_base=KB,
+        )
 
 @app.route('/summaries/<filename>')
 def download_summary(filename):
@@ -70,6 +111,7 @@ if __name__ == '__main__':
         print("Error: OPENAI_API_KEY not found in .env file.")
         print("Please create a .env file and add your OpenAI API key.")
     else:
+        KB.sync_from_directories(pipeline.TRANSCRIPT_DIR, pipeline.SUMMARY_DIR)
         if isinstance(EVENT_BUS, RedisEventBus):
             try:
                 r = redis.from_url(app.config["REDIS_URL"])

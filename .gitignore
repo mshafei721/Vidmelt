@@ -180,3 +180,7 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 PRD.md
+/audio_files
+/summaries
+/transcripts
+/videos

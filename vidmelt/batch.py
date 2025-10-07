@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from . import pipeline, history
+from . import pipeline, history, knowledge
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -47,9 +47,10 @@ def batch_process(args: argparse.Namespace | None = None) -> int:
         print(f"Input directory {input_dir} does not exist")
         return 2
 
-    if ns.resume:
-        from . import history
+    kb = knowledge.KnowledgeBase()
+    kb.sync_from_directories(pipeline.TRANSCRIPT_DIR, pipeline.SUMMARY_DIR)
 
+    if ns.resume:
         jobs = list(history.GLOBAL_STORE.retryable_jobs())
         videos = [(Path(job.video_path), job.id, job.model) for job in jobs]
         print(f"Discovered {len(videos)} job(s) to resume")
@@ -73,7 +74,13 @@ def batch_process(args: argparse.Namespace | None = None) -> int:
 
         selected_model = model if job_id is not None else ns.model
         print(f"Processing {video} with model {selected_model}")
-        pipeline.process_video(video, selected_model, publish=None, job_id=job_id)
+        pipeline.process_video(
+            video,
+            selected_model,
+            publish=None,
+            knowledge_base=kb,
+            job_id=job_id,
+        )
 
     return 0
 
