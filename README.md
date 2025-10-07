@@ -231,6 +231,15 @@ python -m vidmelt.knowledge search "neural networks"
 
 Search results include snippets and paths so you can jump back into the original files.
 
+To power vector search and chat:
+
+```bash
+python -m vidmelt.knowledge embed --db vidmelt_kb.sqlite3
+python -m vidmelt.chat ask "What did the video say about APIs?"
+```
+
+The web UI now includes an “Ask Your Videos” panel that calls the `/chat` endpoint for retrieval-augmented answers with source snippets.
+
 ## 📂 Project Structure
 
 ```
