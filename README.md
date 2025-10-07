@@ -192,6 +192,7 @@ Open your web browser and navigate to `http://127.0.0.1:5000/` (or the address s
 -   Use the web interface to upload your `.mp4` video file.
 -   Monitor the real-time progress updates directly on the page.
 -   Once processing is complete, a link to download the summary Markdown and the raw transcript will appear.
+-   Visit `/jobs` to review recent processing history and re-download summaries.
 
 ### Optional: Batch Mode (CLI)
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import threading
 
-from vidmelt import pipeline
+from vidmelt import pipeline, history
 from vidmelt.events import build_event_bus
 
 # Load environment variables
@@ -24,6 +24,12 @@ TRANSCRIPT_DIR = pipeline.TRANSCRIPT_DIR
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/jobs')
+def jobs():
+    jobs = list(history.GLOBAL_STORE.list_recent(50))
+    return render_template('jobs.html', jobs=jobs)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():

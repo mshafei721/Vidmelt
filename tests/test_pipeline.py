@@ -34,12 +34,31 @@ def temp_dirs(tmp_path, monkeypatch):
     monkeypatch.setattr(summarize_module, "SUMMARY_DIR", summaries)
 
     events = []
+    store_events = SimpleNamespace(started=[], succeeded=[], failed=[])
 
     class DummyBus:
         def publish(self, payload, event_type):
             events.append((event_type, payload.get("message", "")))
 
     monkeypatch.setattr(app_module, "EVENT_BUS", DummyBus())
+
+    class DummyStore:
+        def __init__(self):
+            self._counter = 0
+
+        def record_start(self, video_path, model):
+            self._counter += 1
+            store_events.started.append((Path(video_path), model))
+            return self._counter
+
+        def record_success(self, job_id, summary_path):
+            store_events.succeeded.append((job_id, Path(summary_path)))
+
+        def record_failure(self, job_id, error):
+            store_events.failed.append((job_id, error))
+
+    dummy_store = DummyStore()
+    monkeypatch.setattr(pipeline_module.history, "GLOBAL_STORE", dummy_store)
 
     return SimpleNamespace(
         videos=videos,
@@ -48,6 +67,8 @@ def temp_dirs(tmp_path, monkeypatch):
         summaries=summaries,
         logs=logs,
         events=events,
+        store=dummy_store,
+        store_events=store_events,
     )
 
 
@@ -63,6 +84,7 @@ def test_process_video_skips_transcription_when_transcript_exists(monkeypatch, t
 
     summary_path = temp_dirs.summaries / "sample.md"
     events = temp_dirs.events
+    store_events = temp_dirs.store_events
 
     def fake_summarize(path, title):
         assert path == transcript_path
@@ -86,6 +108,8 @@ def test_process_video_skips_transcription_when_transcript_exists(monkeypatch, t
     complete_message = complete_events[-1]
     assert "summaries/sample.md" in complete_message
     assert "transcripts/sample.txt" in complete_message
+    assert store_events.started and store_events.started[0][0].name == "sample.mp4"
+    assert store_events.succeeded and not store_events.failed
 
 
 def test_process_video_reports_summarization_errors(monkeypatch, temp_dirs):
@@ -96,6 +120,7 @@ def test_process_video_reports_summarization_errors(monkeypatch, temp_dirs):
     transcript_path = temp_dirs.transcripts / "demo.txt"
     summary_path = temp_dirs.summaries / "demo.md"
     events = temp_dirs.events
+    store_events = temp_dirs.store_events
 
     def fake_run(cmd, **kwargs):
         if "ffmpeg" in cmd[0]:
@@ -116,6 +141,7 @@ def test_process_video_reports_summarization_errors(monkeypatch, temp_dirs):
     assert not summary_path.exists(), "Summary file should not be written when summarization fails"
     assert any("boom" in message for event_type, message in events if event_type == "error"), "Error SSE should include root cause"
     assert not any(event_type == "complete" for event_type, _ in events), "Completion event must not fire on failure"
+    assert store_events.failed and not store_events.succeeded
 
 
 def test_process_video_logs_outputs(monkeypatch, temp_dirs):
@@ -138,6 +164,8 @@ def test_process_video_logs_outputs(monkeypatch, temp_dirs):
     monkeypatch.setattr(pipeline_module.subprocess, "run", fake_run)
     monkeypatch.setattr(pipeline_module, "summarize_transcript", lambda path, title: temp_dirs.summaries.joinpath(f"{title}.md").write_text("summary"))
 
+    store_events = temp_dirs.store_events
+
     result = pipeline_module.process_video(video_path, "whisper-base", publish=lambda payload, event_type: None)
     assert result is True
 
@@ -146,3 +174,4 @@ def test_process_video_logs_outputs(monkeypatch, temp_dirs):
     contents = "\n".join(path.read_text() for path in log_files)
     assert "ffmpeg out" in contents
     assert "whisper out" in contents
+    assert store_events.succeeded

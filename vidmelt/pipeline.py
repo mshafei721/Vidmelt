@@ -10,6 +10,7 @@ from typing import Callable, Optional
 import openai
 
 from summarize import SummarizationError, summarize_transcript
+from vidmelt import history
 
 Publisher = Callable[[dict[str, str], str], None]
 
@@ -44,7 +45,12 @@ def _write_log(video_name: str, stage: str, stdout: Optional[str], stderr: Optio
     log_path.write_text("\n\n".join(content) + "\n")
 
 
-def process_video(video_path: Path, transcription_model: str, publish: Optional[Publisher] = None) -> bool:
+def process_video(
+    video_path: Path,
+    transcription_model: str,
+    publish: Optional[Publisher] = None,
+    job_store: Optional[history.JobStore] = None,
+) -> bool:
     """Process a single video and return True on success."""
 
     if shutil.which("ffmpeg") is None:
@@ -56,6 +62,8 @@ def process_video(video_path: Path, transcription_model: str, publish: Optional[
     audio_path = AUDIO_DIR / f"{video_name}.wav"
     transcript_path = TRANSCRIPT_DIR / f"{video_name}.txt"
     summary_path = SUMMARY_DIR / f"{video_name}.md"
+    job_store = job_store or history.GLOBAL_STORE
+    job_id = job_store.record_start(video_path, transcription_model)
 
     try:
         if not audio_path.exists():
@@ -124,6 +132,7 @@ def process_video(video_path: Path, transcription_model: str, publish: Optional[
         except SummarizationError as err:
             msg = f"Summarization failed for {video_name}: {err}"
             _emit(publish, "error", msg, "❌")
+            job_store.record_failure(job_id, msg)
             return False
 
         _emit(publish, "update", f"Summary created for {video_name}. - Ta-da! Your insights are ready! 🌟", "✅")
@@ -132,6 +141,7 @@ def process_video(video_path: Path, transcription_model: str, publish: Optional[
             f"<a href='/summaries/{summary_path.name}' target='_blank'>Download Summary</a> | "
             f"<a href='/transcripts/{transcript_path.name}' target='_blank'>Download Transcript</a> - Mission accomplished! 🚀"
         ), "🎉")
+        job_store.record_success(job_id, summary_path)
         return True
 
     except subprocess.CalledProcessError as exc:
@@ -140,7 +150,9 @@ def process_video(video_path: Path, transcription_model: str, publish: Optional[
             f"Command: {exc.cmd}\nReturn Code: {exc.returncode}\nStdout: {exc.stdout}\nStderr: {exc.stderr} 💥"
         )
         _emit(publish, "error", msg, "❌")
+        job_store.record_failure(job_id, msg)
         return False
     except Exception as exc:  # pragma: no cover - defensive
         _emit(publish, "error", f"An unexpected error occurred: {exc}", "❌")
+        job_store.record_failure(job_id, str(exc))
         return False
