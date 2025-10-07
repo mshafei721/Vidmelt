@@ -34,7 +34,22 @@ def test_chat_cli(monkeypatch, tmp_path, capsys):
             ]
 
     monkeypatch.setattr(chat.knowledge, "KnowledgeBase", lambda db_path: DummyKB(db_path))
-    monkeypatch.setattr(chat, "_load_answer_model", lambda: SimpleNamespace(responses=SimpleNamespace(create=lambda **kwargs: SimpleNamespace(output=[SimpleNamespace(content=[SimpleNamespace(text="Answer")])]))))
+
+    class DummyModel(SimpleNamespace):
+        def responses(self):
+            pass
+
+    dummy_response = SimpleNamespace(output=[SimpleNamespace(content=[SimpleNamespace(text="Answer")])])
+
+    class DummyClient(SimpleNamespace):
+        def responses(self):
+            pass
+
+    monkeypatch.setattr(
+        chat,
+        "_load_answer_model",
+        lambda: SimpleNamespace(responses=SimpleNamespace(create=lambda **kwargs: dummy_response)),
+    )
 
     exit_code = chat.main(["search", "Python", "--db", str(kb_path)])
     assert exit_code == 0

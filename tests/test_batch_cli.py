@@ -21,6 +21,9 @@ def test_batch_cli_dry_run(tmp_path, monkeypatch, capsys):
         def __init__(self, *args, **kwargs):
             pass
 
+        def sync_from_directories(self, *args, **kwargs):
+            pass
+
     monkeypatch.setattr(batch.knowledge, "KnowledgeBase", lambda: DummyKB())
 
     summaries = tmp_path / "summaries"
@@ -66,6 +69,9 @@ def test_batch_cli_skips_completed(tmp_path, monkeypatch):
         def __init__(self, *args, **kwargs):
             pass
 
+        def sync_from_directories(self, *args, **kwargs):
+            pass
+
     monkeypatch.setattr(batch.knowledge, "KnowledgeBase", lambda: DummyKB())
 
     logs = tmp_path / "logs"
@@ -99,6 +105,9 @@ def test_batch_cli_resume(monkeypatch, tmp_path):
 
     class DummyKB:
         def __init__(self, *args, **kwargs):
+            pass
+
+        def sync_from_directories(self, *args, **kwargs):
             pass
 
     monkeypatch.setattr(batch.knowledge, "KnowledgeBase", lambda: DummyKB())

@@ -275,9 +275,23 @@ class KnowledgeBase:
                 )
             )
 
-        hits.sort(key=lambda hit: hit.score)
+            hits.sort(key=lambda hit: hit.score)
         for hit in hits[:limit]:
             yield hit
+
+    def sync_from_directories(
+        self,
+        transcripts_dir: Path,
+        summaries_dir: Path | None = None,
+        *,
+        model_name: str = DEFAULT_EMBED_MODEL,
+    ) -> None:
+        transcripts_dir = Path(transcripts_dir)
+        summaries_dir = Path(summaries_dir) if summaries_dir else None
+        if not transcripts_dir.exists():
+            return
+        self.index_directory(transcripts_dir, summaries_dir)
+        self.build_embeddings(model_name=model_name)
 
 
 def index_documents(

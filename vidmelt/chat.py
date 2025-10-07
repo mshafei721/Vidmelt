@@ -18,16 +18,25 @@ def _load_answer_model():
     return client
 
 
-def generate_answer(question: str, snippets: List[str], *, model: str = DEFAULT_ANSWER_MODEL):
+def generate_answer(question: str, hits: List[knowledge.SemanticHit], *, model: str = DEFAULT_ANSWER_MODEL):
     client = _load_answer_model()
     if callable(client) and not hasattr(client, "responses"):
-        return client(question, snippets)
+        return client(question, hits)
+
+    context_sections = []
+    for idx, hit in enumerate(hits, 1):
+        context_sections.append(
+            f"[{idx}] Video: {hit.video_name}\nSnippet: {hit.snippet}\nTranscript: {hit.transcript_path}\n"
+        )
+
+    context = "\n".join(context_sections)
     prompt = (
-        "You are a helpful assistant answering questions about transcripts. "
-        "Use the provided context to craft a concise answer and cite video names when possible.\n\n"
+        "You are an assistant that answers questions using only the supplied transcript snippets.\n"
+        "If the answer is not contained in the context, say you don't know.\n"
+        "Always cite sources using [index] that corresponds to the snippet.\n\n"
         f"Question: {question}\n"
         "Context:\n"
-        + "\n".join(snippets)
+        f"{context}"
     )
     response = client.responses.create(
         model=model,
@@ -42,8 +51,7 @@ def chat(question: str, kb: knowledge.KnowledgeBase, *, top_k: int = 5) -> Tuple
     if not hits:
         return "I could not find anything relevant.", []
 
-    snippets = [hit.snippet for hit in hits]
-    answer = generate_answer(question, snippets)
+    answer = generate_answer(question, hits)
     sources = [
         {
             "video": hit.video_name,

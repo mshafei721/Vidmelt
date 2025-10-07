@@ -21,7 +21,7 @@ KB = knowledge.KnowledgeBase()
 
 def _default_generate_answer(question: str, hits):
     snippets = [hit.snippet for hit in hits]
-    answer = chat_module.generate_answer(question, snippets)
+    answer = chat_module.generate_answer(question, hits)
     sources = [
         {
             "video": hit.video_name,
@@ -111,6 +111,7 @@ if __name__ == '__main__':
         print("Error: OPENAI_API_KEY not found in .env file.")
         print("Please create a .env file and add your OpenAI API key.")
     else:
+        KB.sync_from_directories(pipeline.TRANSCRIPT_DIR, pipeline.SUMMARY_DIR)
         if isinstance(EVENT_BUS, RedisEventBus):
             try:
                 r = redis.from_url(app.config["REDIS_URL"])

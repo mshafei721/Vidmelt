@@ -48,6 +48,7 @@ def batch_process(args: argparse.Namespace | None = None) -> int:
         return 2
 
     kb = knowledge.KnowledgeBase()
+    kb.sync_from_directories(pipeline.TRANSCRIPT_DIR, pipeline.SUMMARY_DIR)
 
     if ns.resume:
         jobs = list(history.GLOBAL_STORE.retryable_jobs())
