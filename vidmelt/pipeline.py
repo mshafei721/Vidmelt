@@ -49,7 +49,9 @@ def process_video(
     video_path: Path,
     transcription_model: str,
     publish: Optional[Publisher] = None,
+    *,
     job_store: Optional[history.JobStore] = None,
+    job_id: Optional[int] = None,
 ) -> bool:
     """Process a single video and return True on success."""
 
@@ -63,7 +65,10 @@ def process_video(
     transcript_path = TRANSCRIPT_DIR / f"{video_name}.txt"
     summary_path = SUMMARY_DIR / f"{video_name}.md"
     job_store = job_store or history.GLOBAL_STORE
-    job_id = job_store.record_start(video_path, transcription_model)
+    if job_id is None:
+        job_id = job_store.record_start(video_path, transcription_model)
+    else:
+        job_store.record_retry(job_id)
 
     try:
         if not audio_path.exists():

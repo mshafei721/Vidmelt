@@ -70,3 +70,17 @@ def test_doctor_passes_when_dependencies_ok(monkeypatch):
 
     assert ok
     assert not issues
+
+
+def test_doctor_skips_redis_in_memory(monkeypatch):
+    monkeypatch.setenv("VIDMELT_EVENT_STRATEGY", "in-memory")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    doctor = load_doctor(monkeypatch)
+
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/usr/bin/%s" % name)
+    monkeypatch.setattr(doctor.importlib, "import_module", lambda name: SimpleNamespace(__name__=name))
+
+    ok, issues = doctor.run_diagnostics()
+
+    assert ok
+    assert not any("Redis" in issue for issue in issues)

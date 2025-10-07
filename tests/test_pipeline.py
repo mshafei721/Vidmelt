@@ -34,7 +34,7 @@ def temp_dirs(tmp_path, monkeypatch):
     monkeypatch.setattr(summarize_module, "SUMMARY_DIR", summaries)
 
     events = []
-    store_events = SimpleNamespace(started=[], succeeded=[], failed=[])
+    store_events = SimpleNamespace(started=[], succeeded=[], failed=[], retries=[])
 
     class DummyBus:
         def publish(self, payload, event_type):
@@ -50,6 +50,9 @@ def temp_dirs(tmp_path, monkeypatch):
             self._counter += 1
             store_events.started.append((Path(video_path), model))
             return self._counter
+
+        def record_retry(self, job_id):
+            store_events.retries.append(job_id)
 
         def record_success(self, job_id, summary_path):
             store_events.succeeded.append((job_id, Path(summary_path)))
@@ -175,3 +178,31 @@ def test_process_video_logs_outputs(monkeypatch, temp_dirs):
     assert "ffmpeg out" in contents
     assert "whisper out" in contents
     assert store_events.succeeded
+
+
+def test_process_video_retry(monkeypatch, temp_dirs):
+    video_path = temp_dirs.videos / "retry.mp4"
+    video_path.write_bytes(b"video")
+
+    audio_path = temp_dirs.audio / "retry.wav"
+    audio_path.write_bytes(b"audio")
+    transcript_path = temp_dirs.transcripts / "retry.txt"
+    transcript_path.write_text("existing transcript")
+
+    store_events = temp_dirs.store_events
+
+    def fake_summarize(path, title):
+        temp_dirs.summaries.joinpath(f"{title}.md").write_text("summary")
+
+    monkeypatch.setattr(pipeline_module.shutil, "which", lambda name: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(pipeline_module, "summarize_transcript", fake_summarize)
+
+    result = pipeline_module.process_video(
+        video_path,
+        "whisper-base",
+        publish=lambda payload, event_type: None,
+        job_id=42,
+    )
+
+    assert result is True
+    assert store_events.retries == [42]

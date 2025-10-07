@@ -204,6 +204,12 @@ python -m vidmelt.batch /path/to/videos --model whisper-base
 
 Add `--dry-run` to preview the work queue. The CLI reuses the core pipeline and skips videos that already have a Markdown summary in `summaries/`.
 
+To retry failed or stuck jobs recorded in the history DB, run:
+
+```bash
+python -m vidmelt.batch --resume
+```
+
 ### Optional: Redis-less Events
 
 By default Vidmelt streams progress using Redis. To run without Redis (useful on single-node or WSL setups), set:
@@ -213,6 +219,17 @@ export VIDMELT_EVENT_STRATEGY=in-memory
 ```
 
 This enables an in-process Server-Sent Events channel. Limit usage to one Flask instance per machine because events are kept in-memory.
+
+### Optional: Transcript Knowledge Base
+
+Index transcripts and summaries into a local SQLite FTS database for fast search:
+
+```bash
+python -m vidmelt.knowledge index transcripts/ --summaries summaries/
+python -m vidmelt.knowledge search "neural networks"
+```
+
+Search results include snippets and paths so you can jump back into the original files.
 
 ## 📂 Project Structure
 
@@ -235,6 +252,7 @@ vidmelt/
 ├── summaries/            # 📄 Final .md files with summaries
 │   └── .gitkeep
 ├── logs/                 # 🪵 FFmpeg/Whisper diagnostic logs per video
+├── vidmelt_kb.sqlite3    # 📚 Optional knowledge-base index (after you run the CLI)
 └── templates/            # 🖥️ HTML templates for the web interface
     └── index.html
 ```

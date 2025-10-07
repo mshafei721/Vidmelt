@@ -1,3 +1,3 @@
 """Vidmelt package utilities."""
 
-__all__ = ["doctor", "pipeline", "batch", "history"]
+__all__ = ["doctor", "pipeline", "batch", "history", "knowledge"]

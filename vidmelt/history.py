@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     status TEXT NOT NULL,
     error TEXT,
     started_at REAL NOT NULL,
-    finished_at REAL
+    finished_at REAL,
+    attempt_count INTEGER NOT NULL DEFAULT 0
 );
 """
 
@@ -32,6 +33,7 @@ class JobRecord:
     error: Optional[str]
     started_at: float
     finished_at: Optional[float]
+    attempt_count: int
 
 
 class JobStore:
@@ -40,6 +42,10 @@ class JobStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.execute(SCHEMA)
+            try:
+                conn.execute("ALTER TABLE jobs ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
@@ -48,11 +54,20 @@ class JobStore:
         started = time.time()
         with self._connect() as conn:
             cur = conn.execute(
-                "INSERT INTO jobs (video_path, model, status, started_at) VALUES (?, ?, ?, ?)",
-                (str(video_path), model, "processing", started),
+                "INSERT INTO jobs (video_path, model, status, started_at, attempt_count) VALUES (?, ?, ?, ?, ?)",
+                (str(video_path), model, "processing", started, 1),
             )
             conn.commit()
             return int(cur.lastrowid)
+
+    def record_retry(self, job_id: int) -> None:
+        started = time.time()
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE jobs SET status = ?, error = NULL, finished_at = NULL, attempt_count = attempt_count + 1, started_at = ? WHERE id = ?",
+                ("processing", started, job_id),
+            )
+            conn.commit()
 
     def record_success(self, job_id: int, summary_path: Path) -> None:
         finished = time.time()
@@ -75,7 +90,7 @@ class JobStore:
     def list_recent(self, limit: int = 20) -> Iterator[JobRecord]:
         with self._connect() as conn:
             cur = conn.execute(
-                "SELECT id, video_path, summary_path, model, status, error, started_at, finished_at "
+                "SELECT id, video_path, summary_path, model, status, error, started_at, finished_at, attempt_count "
                 "FROM jobs ORDER BY started_at DESC LIMIT ?",
                 (limit,),
             )
@@ -86,8 +101,18 @@ class JobStore:
     def pending_jobs(self) -> Iterator[JobRecord]:
         with self._connect() as conn:
             cur = conn.execute(
-                "SELECT id, video_path, summary_path, model, status, error, started_at, finished_at "
+                "SELECT id, video_path, summary_path, model, status, error, started_at, finished_at, attempt_count "
                 "FROM jobs WHERE status = 'processing' ORDER BY started_at"
+            )
+            rows = cur.fetchall()
+        for row in rows:
+            yield JobRecord(*row)
+
+    def retryable_jobs(self) -> Iterator[JobRecord]:
+        with self._connect() as conn:
+            cur = conn.execute(
+                "SELECT id, video_path, summary_path, model, status, error, started_at, finished_at, attempt_count "
+                "FROM jobs WHERE status IN ('failed', 'processing') ORDER BY started_at"
             )
             rows = cur.fetchall()
         for row in rows:

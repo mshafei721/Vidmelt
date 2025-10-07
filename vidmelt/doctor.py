@@ -56,9 +56,15 @@ def run_diagnostics(*, redis_url: str = DEFAULT_REDIS_URL, env: dict[str, str] |
 
     environment = env or os.environ
 
+    strategy = environment.get("VIDMELT_EVENT_STRATEGY", "auto").lower()
+    if strategy == "in-memory":
+        redis_check = Diagnostic("Redis", True, "skipped (VIDMELT_EVENT_STRATEGY=in-memory)")
+    else:
+        redis_check = _check_redis(redis_url)
+
     checks: Sequence[Diagnostic] = (
         _check_ffmpeg(),
-        _check_redis(redis_url),
+        redis_check,
         _check_whisper(),
         _check_openai_key(environment),
     )

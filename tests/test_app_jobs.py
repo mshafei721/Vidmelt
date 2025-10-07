@@ -20,6 +20,7 @@ def client(monkeypatch):
                     error=None,
                     started_at=123.0,
                     finished_at=456.0,
+                    attempt_count=1,
                 )
             ]
 
