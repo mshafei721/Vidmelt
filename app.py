@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import threading
 
 from vidmelt import pipeline, history
-from vidmelt.events import build_event_bus
+from vidmelt.events import build_event_bus, RedisEventBus
 
 # Load environment variables
 load_dotenv()
@@ -70,11 +70,15 @@ if __name__ == '__main__':
         print("Error: OPENAI_API_KEY not found in .env file.")
         print("Please create a .env file and add your OpenAI API key.")
     else:
-        try:
-            # Test Redis connection
-            r = redis.from_url(app.config["REDIS_URL"])
-            r.ping()
-            print("DEBUG: Successfully connected to Redis.")
-            app.run(debug=True)
-        except redis.exceptions.ConnectionError as e:
-            print(f"Error: Could not connect to Redis at {app.config["REDIS_URL"]}. Please ensure Redis is running. Error: {e}")
+        if isinstance(EVENT_BUS, RedisEventBus):
+            try:
+                r = redis.from_url(app.config["REDIS_URL"])
+                r.ping()
+                print("DEBUG: Successfully connected to Redis.")
+            except redis.exceptions.ConnectionError as e:
+                print(f"Error: Could not connect to Redis at {app.config['REDIS_URL']}. Please ensure Redis is running. Error: {e}")
+                raise SystemExit(1)
+        else:
+            print("INFO: Running with in-memory event bus; Redis check skipped.")
+
+        app.run(debug=True)
