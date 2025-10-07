@@ -27,9 +27,12 @@ def test_batch_cli_dry_run(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(batch.pipeline, "LOG_DIR", logs)
 
     processed = []
-    monkeypatch.setattr(batch.pipeline, "process_video", lambda *args, **kwargs: processed.append(args[0]))
+    def fake_process(video, model, publish=None, job_id=None):
+        processed.append(video)
 
-    args = SimpleNamespace(input_dir=videos, model="whisper-base", dry_run=True)
+    monkeypatch.setattr(batch.pipeline, "process_video", fake_process)
+
+    args = SimpleNamespace(input_dir=videos, model="whisper-base", dry_run=True, resume=False)
     exit_code = batch.batch_process(args)
 
     assert exit_code == 0
@@ -62,13 +65,54 @@ def test_batch_cli_skips_completed(tmp_path, monkeypatch):
 
     calls = []
 
-    def fake_process(video_path, model, publish=None):
+    def fake_process(video_path, model, publish=None, job_id=None):
         calls.append((video_path, model))
 
     monkeypatch.setattr(batch.pipeline, "process_video", fake_process)
 
-    args = SimpleNamespace(input_dir=videos, model="whisper-base", dry_run=False)
+    args = SimpleNamespace(input_dir=videos, model="whisper-base", dry_run=False, resume=False)
     exit_code = batch.batch_process(args)
 
     assert exit_code == 0
     assert calls == [(pending, "whisper-base")], "CLI should skip videos with existing summaries"
+
+
+def test_batch_cli_resume(monkeypatch, tmp_path):
+    videos_dir = tmp_path / "videos"
+    videos_dir.mkdir()
+    (videos_dir / "retry.mp4").write_bytes(b"video")
+
+    import vidmelt.batch as batch
+    from vidmelt import history
+
+    class DummyStore:
+        def retryable_jobs(self):
+            return [
+                history.JobRecord(
+                    id=7,
+                    video_path=str(videos_dir / "retry.mp4"),
+                    summary_path=None,
+                    model="whisper-medium",
+                    status="processing",
+                    error=None,
+                    started_at=0.0,
+                    finished_at=None,
+                    attempt_count=2,
+                )
+            ]
+
+    monkeypatch.setattr(batch.history, "GLOBAL_STORE", DummyStore())
+
+    calls = []
+
+    def fake_process(video, model, publish=None, job_id=None):
+        calls.append((video, model, job_id))
+
+    monkeypatch.setattr(batch.pipeline, "SUMMARY_DIR", tmp_path / "summaries")
+    monkeypatch.setattr(batch.pipeline, "process_video", fake_process)
+
+    args = SimpleNamespace(input_dir=videos_dir, model="whisper-base", dry_run=False, resume=True)
+    exit_code = batch.batch_process(args)
+
+    assert exit_code == 0
+    assert calls == [(Path(videos_dir / "retry.mp4"), "whisper-medium", 7)]

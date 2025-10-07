@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from . import pipeline
+from . import pipeline, history
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -27,6 +27,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="List the videos that would be processed without running the pipeline",
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Retry failed or in-progress jobs recorded in the history store",
+    )
     return parser.parse_args(argv)
 
 
@@ -42,22 +47,33 @@ def batch_process(args: argparse.Namespace | None = None) -> int:
         print(f"Input directory {input_dir} does not exist")
         return 2
 
-    videos = list(_iter_videos(input_dir))
-    print(f"Discovered {len(videos)} video(s) in {input_dir}")
+    if ns.resume:
+        from . import history
+
+        jobs = list(history.GLOBAL_STORE.retryable_jobs())
+        videos = [(Path(job.video_path), job.id, job.model) for job in jobs]
+        print(f"Discovered {len(videos)} job(s) to resume")
+    else:
+        videos = [(video, None, ns.model) for video in _iter_videos(input_dir)]
+        print(f"Discovered {len(videos)} video(s) in {input_dir}")
 
     if ns.dry_run:
-        for video in videos:
-            print(f"[DRY RUN] {video}")
+        for video, job_id, model in videos:
+            label = f"{video}"
+            if job_id is not None:
+                label += f" (job #{job_id})"
+            print(f"[DRY RUN] {label}")
         return 0
 
-    for video in videos:
+    for video, job_id, model in videos:
         summary_path = pipeline.SUMMARY_DIR / f"{video.stem}.md"
-        if summary_path.exists():
+        if summary_path.exists() and job_id is None:
             print(f"Skipping {video} (summary already exists)")
             continue
 
-        print(f"Processing {video} with model {ns.model}")
-        pipeline.process_video(video, ns.model, publish=None)
+        selected_model = model if job_id is not None else ns.model
+        print(f"Processing {video} with model {selected_model}")
+        pipeline.process_video(video, selected_model, publish=None, job_id=job_id)
 
     return 0
 

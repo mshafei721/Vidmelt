@@ -204,6 +204,12 @@ python -m vidmelt.batch /path/to/videos --model whisper-base
 
 Add `--dry-run` to preview the work queue. The CLI reuses the core pipeline and skips videos that already have a Markdown summary in `summaries/`.
 
+To retry failed or stuck jobs recorded in the history DB, run:
+
+```bash
+python -m vidmelt.batch --resume
+```
+
 ### Optional: Redis-less Events
 
 By default Vidmelt streams progress using Redis. To run without Redis (useful on single-node or WSL setups), set:
