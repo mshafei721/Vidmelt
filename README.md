@@ -1,5 +1,7 @@
 # 🎬 Vidmelt: AI-Powered Video Transcription & Summarization 🚀
 
+**Current Version:** 1.1.0
+
 Vidmelt is a local automation agent designed to effortlessly transform your video content into actionable insights. It converts videos into audio, transcribes speech using OpenAI Whisper, and summarizes the content using advanced OpenAI GPT models. All accessible through a simple, real-time web interface!
 
 ## ✨ Features
@@ -11,6 +13,8 @@ Vidmelt is a local automation agent designed to effortlessly transform your vide
 -   **📄 Markdown Output**: Produces well-structured Markdown files for each video, containing the summary.
 -   **🔄 Real-time Progress**: Get live updates on the processing status directly in your browser.
 -   **🔗 Local Access**: Download your summaries directly from the web interface.
+-   **🗂️ Persistent Knowledge Base**: Every transcript and summary is automatically embedded into a local SQLite vector index—no manual sync required, even across restarts.
+-   **💬 Multi-turn “Ask Your Videos” Chat**: The built-in chat remembers conversation history, cites relevant snippets, and lets you hit Enter to send messages for a smooth Q&A workflow.
 
 ## 🛠️ Prerequisites
 
