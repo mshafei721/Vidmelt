@@ -5,59 +5,113 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vidmelt - Video Summarizer</title>
     <style>
+        :root {
+            --color-depth-1: #ab6a1a;
+            --color-depth-2: #d78521;
+            --color-depth-3: #e39d48;
+            --color-depth-4: #eab574;
+
+            --text-on-depth-1: #f9f5ef;
+            --text-on-depth-2: #fff4e2;
+            --text-on-depth-3: #000000;
+            --text-on-depth-4: #000000;
+
+            --shadow-small: inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(0,0,0,0.12);
+            --shadow-medium: inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 6px rgba(0,0,0,0.15);
+            --shadow-large: inset 0 2px 0 rgba(255,255,255,0.20), 0 6px 12px rgba(0,0,0,0.20);
+            --gradient-premium: linear-gradient(to bottom, #f8b45d, #c6771d);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-depth-1: #1f1407;
+                --color-depth-2: #7f4d12;
+                --color-depth-3: #a5621a;
+                --color-depth-4: #c87a29;
+
+                --text-on-depth-1: #fff2e2;
+                --text-on-depth-2: #fff8f0;
+                --text-on-depth-3: #ffffff;
+                --text-on-depth-4: #ffffff;
+
+                --shadow-small: inset 0 1px 0 rgba(0,0,0,0.20), 0 1px 2px rgba(255,255,255,0.08);
+                --shadow-medium: inset 0 1px 0 rgba(0,0,0,0.24), 0 3px 6px rgba(255,255,255,0.10);
+                --shadow-large: inset 0 2px 0 rgba(0,0,0,0.28), 0 6px 12px rgba(255,255,255,0.12);
+                --gradient-premium: linear-gradient(to bottom, #b26c1a, #3a2609);
+            }
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f4f4f4;
-            color: #333;
+            font-family: "Inter", "Segoe UI", Arial, sans-serif;
+            margin: 0;
+            padding: 32px 16px 64px;
+            background-color: var(--color-depth-1);
+            color: var(--text-on-depth-1);
+            transition: background-color 0.3s ease;
         }
+
         .container {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            max-width: 600px;
+            background: var(--color-depth-2);
+            color: var(--text-on-depth-2);
+            padding: 32px;
+            border-radius: 20px;
+            box-shadow: var(--shadow-medium);
+            max-width: 720px;
             margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
         }
+
         h1 {
-            color: #0056b3;
+            color: var(--text-on-depth-2);
             text-align: center;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
         }
         .upload-form {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 12px;
         }
         .upload-form input[type="file"] {
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            background: var(--color-depth-3);
+            color: var(--text-on-depth-3);
+            box-shadow: var(--shadow-small);
         }
         .upload-form input[type="submit"] {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 15px;
+            background: var(--gradient-premium);
+            color: var(--text-on-depth-3);
+            padding: 12px 18px;
             border: none;
-            border-radius: 4px;
+            border-radius: 14px;
             cursor: pointer;
             font-size: 16px;
+            font-weight: 600;
+            box-shadow: var(--shadow-medium);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         .upload-form input[type="submit"]:hover {
-            background-color: #0056b3;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-large);
         }
         .status-box {
-            border: 1px solid #ccc;
-            padding: 15px;
-            border-radius: 4px;
-            background-color: #e9e9e9;
-            min-height: 100px;
+            padding: 20px;
+            border-radius: 16px;
+            background-color: var(--color-depth-2);
+            box-shadow: var(--shadow-small);
+            min-height: 120px;
             overflow-y: auto;
         }
         .status-message {
             margin-bottom: 5px;
             display: flex;
             align-items: center;
+            color: var(--text-on-depth-2);
         }
         .status-message .icon {
             margin-right: 8px;
@@ -67,13 +121,13 @@
             color: red;
         }
         .status-message.complete {
-            color: green;
-            font-weight: bold;
+            color: var(--color-depth-4);
+            font-weight: 600;
         }
-        /* Spinner CSS */
+
         .spinner {
             border: 4px solid rgba(0, 0, 0, 0.1);
-            border-left-color: #007bff;
+            border-left-color: var(--color-depth-4);
             border-radius: 50%;
             width: 24px;
             height: 24px;
@@ -87,37 +141,51 @@
         }
         .chat-container {
             margin-top: 2rem;
-            padding: 1.5rem;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            background-color: #fff;
+            padding: 1.75rem;
+            border-radius: 20px;
+            background-color: var(--color-depth-2);
+            color: var(--text-on-depth-2);
+            box-shadow: var(--shadow-medium);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
         .chat-form textarea {
             width: 100%;
-            min-height: 80px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            min-height: 96px;
+            padding: 12px;
+            border: none;
+            border-radius: 14px;
+            background: var(--color-depth-3);
+            color: var(--text-on-depth-3);
             resize: vertical;
+            box-shadow: var(--shadow-small);
         }
         .chat-form button {
-            margin-top: 10px;
-            padding: 8px 16px;
-            background-color: #28a745;
-            color: #fff;
+            align-self: flex-end;
+            margin-top: 12px;
+            padding: 10px 20px;
+            background: var(--gradient-premium);
+            color: var(--text-on-depth-3);
             border: none;
-            border-radius: 4px;
+            border-radius: 14px;
             cursor: pointer;
+            font-weight: 600;
+            box-shadow: var(--shadow-medium);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         .chat-form button:hover {
-            background-color: #1e7e34;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-large);
         }
         .chat-answer {
             margin-top: 1rem;
             font-weight: 500;
+            color: var(--text-on-depth-2);
         }
         .chat-conversation p {
             margin: 0.25rem 0;
+            color: var(--text-on-depth-2);
         }
         .chat-sources ul {
             margin-top: 0.5rem;
@@ -127,7 +195,7 @@
             margin-bottom: 0.4rem;
         }
         .chat-sources .error {
-            color: #d32f2f;
+            color: #3d0a0a;
         }
     </style>
 </head>
