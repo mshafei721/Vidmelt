@@ -18,25 +18,6 @@ app.config["REDIS_URL"] = "redis://localhost:6379/0"
 EVENT_BUS = build_event_bus(app)
 KB = knowledge.KnowledgeBase()
 
-
-def _default_generate_answer(question: str, hits):
-    snippets = [hit.snippet for hit in hits]
-    answer = chat_module.generate_answer(question, hits)
-    sources = [
-        {
-            "video": hit.video_name,
-            "transcript": hit.transcript_path,
-            "summary": hit.summary_path,
-            "snippet": hit.snippet,
-            "score": hit.score,
-        }
-        for hit in hits
-    ]
-    return answer, sources
-
-
-generate_answer = _default_generate_answer
-
 # Directories (shared with pipeline module)
 UPLOAD_FOLDER = pipeline.UPLOAD_FOLDER
 SUMMARY_DIR = pipeline.SUMMARY_DIR
@@ -60,11 +41,15 @@ def chat_endpoint():
     if not question:
         return jsonify({"error": "question is required"}), 400
     top_k = int(payload.get('top_k', 5))
-    hits = list(KB.semantic_search(question, limit=top_k))
-    if not hits:
-        return jsonify({"answer": "I could not find anything relevant.", "sources": []})
-
-    answer, sources = generate_answer(question, hits)
+    history = payload.get('history') or []
+    if not isinstance(history, list):
+        history = []
+    answer, sources = chat_module.chat(
+        question,
+        KB,
+        top_k=top_k,
+        history=history,
+    )
     return jsonify({"answer": answer, "sources": sources})
 
 @app.route('/upload', methods=['POST'])
