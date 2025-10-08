@@ -19,16 +19,15 @@ def chat_client(monkeypatch):
             )
 
     monkeypatch.setattr(app, "KB", DummyKB())
-    monkeypatch.setattr(app, "generate_answer", lambda question, hits: (
+    monkeypatch.setattr(app.chat_module, "chat", lambda question, kb, top_k=5, history=None: (
         "Answer about Python",
         [
             {
-                "video": hit.video_name,
-                "snippet": hit.snippet,
-                "summary": hit.summary_path,
-                "score": hit.score,
+                "video": "demo",
+                "snippet": "Snippet about Python",
+                "summary": "summaries/demo.md",
+                "score": 0.1,
             }
-            for hit in hits
         ],
     ))
     return app.app.test_client()

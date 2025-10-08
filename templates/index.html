@@ -116,6 +116,9 @@
             margin-top: 1rem;
             font-weight: 500;
         }
+        .chat-conversation p {
+            margin: 0.25rem 0;
+        }
         .chat-sources ul {
             margin-top: 0.5rem;
             padding-left: 1.2rem;
@@ -155,8 +158,9 @@
                 <textarea id="chatQuestion" placeholder="Ask a question about your transcripts..." required></textarea>
                 <button type="submit">Ask</button>
             </form>
-            <div id="chatAnswer" class="chat-answer"></div>
-            <div id="chatSources" class="chat-sources"></div>
+        <div id="chatConversation" class="chat-conversation"></div>
+        <div id="chatAnswer" class="chat-answer"></div>
+        <div id="chatSources" class="chat-sources"></div>
         </div>
     </div>
 
@@ -168,6 +172,8 @@
         const chatQuestion = document.getElementById('chatQuestion');
         const chatAnswer = document.getElementById('chatAnswer');
         const chatSources = document.getElementById('chatSources');
+        const chatConversation = document.getElementById('chatConversation');
+        let chatHistory = [];
 
         function showSpinner() {
             loadingSpinner.style.display = 'block';
@@ -243,6 +249,15 @@
 
         chatForm.addEventListener('submit', async (event) => {
             event.preventDefault();
+            const question = chatQuestion.value.trim();
+            if (!question) {
+                return;
+            }
+
+            const historyPayload = chatHistory.map((entry) => ({ role: entry.role, content: entry.content }));
+            chatHistory.push({ role: 'user', content: question });
+            renderConversation();
+            chatQuestion.value = '';
             chatAnswer.textContent = 'Thinking...';
             chatSources.innerHTML = '';
 
@@ -250,14 +265,16 @@
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question: chatQuestion.value })
+                    body: JSON.stringify({ question, history: historyPayload })
                 });
                 if (!response.ok) {
                     const error = await response.json();
                     throw new Error(error.error || 'Chat failed');
                 }
                 const data = await response.json();
+                chatHistory.push({ role: 'assistant', content: data.answer });
                 chatAnswer.textContent = data.answer;
+                renderConversation();
                 if (data.sources && data.sources.length > 0) {
                     const list = document.createElement('ul');
                     data.sources.forEach((source) => {
@@ -271,8 +288,24 @@
                     chatSources.innerHTML = '';
                 }
             } catch (error) {
-                chatAnswer.textContent = '';
-                chatSources.innerHTML = `<span class="error">${error.message}</span>`;
+                const message = `Error: ${error.message}`;
+                chatHistory.push({ role: 'assistant', content: message });
+                chatAnswer.textContent = message;
+                renderConversation();
+            }
+        });
+
+        function renderConversation() {
+            chatConversation.innerHTML = chatHistory.map((entry) => {
+                const role = entry.role === 'assistant' ? 'Assistant' : 'You';
+                return `<p><strong>${role}:</strong> ${entry.content}</p>`;
+            }).join('');
+        }
+
+        chatQuestion.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                chatForm.requestSubmit();
             }
         });
 

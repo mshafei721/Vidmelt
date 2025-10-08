@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
-from typing import Iterable, List, Sequence, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 from . import knowledge
 
@@ -12,52 +11,74 @@ DEFAULT_ANSWER_MODEL = "gpt-4o-mini"
 
 
 def _load_answer_model():
-    from openai import OpenAI
+    from openai import OpenAI  # pragma: no cover
 
-    client = OpenAI()
-    return client
+    return OpenAI()
 
 
-def generate_answer(question: str, hits: List[knowledge.SemanticHit], *, model: str = DEFAULT_ANSWER_MODEL):
+def generate_answer(
+    question: str,
+    hits: List[knowledge.SemanticHit],
+    *,
+    history: Optional[List[dict]] = None,
+    model: str = DEFAULT_ANSWER_MODEL,
+):
     client = _load_answer_model()
     if callable(client) and not hasattr(client, "responses"):
-        return client(question, hits)
+        return client(question, hits, history=history)
 
-    context_sections = []
+    context_sections: List[str] = []
     for idx, hit in enumerate(hits, 1):
         context_sections.append(
-            f"[{idx}] Video: {hit.video_name}\nSnippet: {hit.snippet}\nTranscript: {hit.transcript_path}\n"
+            f"[{idx}] Video: {hit.video_name}\n"
+            f"Snippet: {hit.snippet}\n"
+            f"Transcript: {hit.transcript_path}\n"
         )
+    context = "".join(context_sections)
 
-    context = "\n".join(context_sections)
+    conversation = ""
+    if history:
+        formatted = [
+            f"{msg.get('role', 'user').title()}: {msg.get('content', '')}" for msg in history
+        ]
+        conversation = "\n".join(formatted)
+
     prompt = (
         "You are an assistant that answers questions using only the supplied transcript snippets.\n"
         "If the answer is not contained in the context, say you don't know.\n"
         "Always cite sources using [index] that corresponds to the snippet.\n\n"
-        f"Question: {question}\n"
-        "Context:\n"
-        f"{context}"
+        + (f"Conversation so far:\n{conversation}\n\n" if conversation else "")
+        + f"Question: {question}\n"
+        + "Context:\n"
+        + f"{context}"
     )
     response = client.responses.create(
         model=model,
         input=[{"role": "user", "content": prompt}],
     )
-    content = response.output[0].content[0].text
-    return content
+    return response.output[0].content[0].text
 
 
-def chat(question: str, kb: knowledge.KnowledgeBase, *, top_k: int = 5) -> Tuple[str, List[dict]]:
+def chat(
+    question: str,
+    kb: knowledge.KnowledgeBase,
+    *,
+    top_k: int = 5,
+    history: Optional[List[dict]] = None,
+    model: str = DEFAULT_ANSWER_MODEL,
+) -> Tuple[str, List[dict]]:
     hits = list(kb.semantic_search(question, limit=top_k))
     if not hits:
         return "I could not find anything relevant.", []
 
-    answer = generate_answer(question, hits)
+    answer = generate_answer(question, hits, history=history, model=model)
     sources = [
         {
             "video": hit.video_name,
             "transcript": hit.transcript_path,
             "summary": hit.summary_path,
             "snippet": hit.snippet,
+            "score": hit.score,
         }
         for hit in hits
     ]
@@ -118,7 +139,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 1
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == '__main__':  # pragma: no cover
     import sys
 
     raise SystemExit(main(sys.argv[1:]))
