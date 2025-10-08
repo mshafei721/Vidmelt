@@ -1,5 +1,6 @@
 openai
 ffmpeg-python
+ffmpeg
 python-dotenv
 Flask
 flask-sse
@@ -7,3 +8,4 @@ redis
 openai-whisper
 numpy<2.3
 numba<0.60
+sentence-transformers
